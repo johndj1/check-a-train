@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 type Service = {
   dep: string; // "HH:mm"
@@ -22,36 +23,73 @@ function addMinutes(hhmm: string, mins: number) {
 }
 
 function makeMockServices(anchorTime: string, windowMins: number): Service[] {
-  // Generate 6 services between -window and +window minutes
   const offsets = [-windowMins, -20, -5, 10, 25, windowMins].sort((a, b) => a - b);
-
   const statuses: Service["status"][] = ["On time", "On time", "Delayed", "On time", "Cancelled", "On time"];
 
   return offsets.map((off, i) => {
     const dep = addMinutes(anchorTime, off);
-    const duration = 28 + (i % 3) * 6; // 28/34/40 mins
+    const duration = 28 + (i % 3) * 6;
     const arr = addMinutes(dep, duration);
     return { dep, arr, status: statuses[i] ?? "On time" };
   });
 }
 
-export default function Home() {
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
-  const [time, setTime] = useState(() => {
-    const d = new Date();
-    return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  });
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
 
-  const [submitted, setSubmitted] = useState(false);
-  const [windowMins, setWindowMins] = useState(30);
+function nowHHMM() {
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+export default function Home() {
+  const router = useRouter();
+  const sp = useSearchParams();
+
+  // Read state from URL (with sensible defaults)
+  const fromUrl = sp.get("from") ?? "";
+  const toUrl = sp.get("to") ?? "";
+  const dateUrl = sp.get("date") ?? todayISO();
+  const timeUrl = sp.get("time") ?? nowHHMM();
+  const windowUrl = Number(sp.get("window") ?? "30");
+  const submitted = sp.get("submitted") === "1";
+
+  // Controlled inputs backed by URL state (so typing is smooth)
+  const [from, setFrom] = useState(fromUrl);
+  const [to, setTo] = useState(toUrl);
+  const [date, setDate] = useState(dateUrl);
+  const [time, setTime] = useState(timeUrl);
+
   const [error, setError] = useState<string | null>(null);
+
+  const windowMins = Number.isFinite(windowUrl) ? Math.min(Math.max(windowUrl, 15), 180) : 30;
 
   const services = useMemo(() => {
     if (!submitted) return [];
-    return makeMockServices(time, windowMins);
-  }, [submitted, time, windowMins]);
+    return makeMockServices(timeUrl, windowMins);
+  }, [submitted, timeUrl, windowMins]);
+
+  function updateUrl(next: {
+    from?: string;
+    to?: string;
+    date?: string;
+    time?: string;
+    window?: number;
+    submitted?: boolean;
+  }) {
+    const params = new URLSearchParams(sp.toString());
+
+    if (next.from !== undefined) params.set("from", next.from);
+    if (next.to !== undefined) params.set("to", next.to);
+    if (next.date !== undefined) params.set("date", next.date);
+    if (next.time !== undefined) params.set("time", next.time);
+
+    if (next.window !== undefined) params.set("window", String(next.window));
+    if (next.submitted !== undefined) params.set("submitted", next.submitted ? "1" : "0");
+
+    router.replace(`/?${params.toString()}`);
+  }
 
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -69,20 +107,28 @@ export default function Home() {
       return;
     }
 
-    setSubmitted(true);
-    setWindowMins(30);
+    // Commit form inputs to URL, and mark as submitted
+    router.replace(
+      `/?from=${encodeURIComponent(f)}&to=${encodeURIComponent(t)}&date=${encodeURIComponent(
+        date
+      )}&time=${encodeURIComponent(time)}&window=30&submitted=1`
+    );
   }
 
-  function reset() {
-    setSubmitted(false);
-    setWindowMins(30);
+  function onReset() {
+    setError(null);
+    setFrom("");
+    setTo("");
+    setDate(todayISO());
+    setTime(nowHHMM());
+    router.replace(`/`);
   }
 
   return (
     <main className="min-h-screen bg-zinc-950 text-zinc-100">
       <div className="mx-auto max-w-3xl px-6 py-12">
         <header className="mb-10">
-          <h1 className="text-3xl font-bold tracking-tight">Recent Train Times</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Check-a-Train</h1>
           <p className="mt-2 text-zinc-400">Quick A → B departures around a time. (Mock data for now.)</p>
         </header>
 
@@ -145,7 +191,7 @@ export default function Home() {
 
                 <button
                   type="button"
-                  onClick={reset}
+                  onClick={onReset}
                   className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
                 >
                   Reset
@@ -160,22 +206,22 @@ export default function Home() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">
-                  {from.trim()} → {to.trim()}
+                  {fromUrl || from.trim()} → {toUrl || to.trim()}
                 </h2>
                 <p className="text-sm text-zinc-400">
-                  {date} · window ±{windowMins} minutes around {time}
+                  {dateUrl} · window ±{windowMins} minutes around {timeUrl}
                 </p>
               </div>
 
               <div className="flex gap-2">
                 <button
-                  onClick={() => setWindowMins(60)}
+                  onClick={() => updateUrl({ window: 60, submitted: true })}
                   className="rounded-xl border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
                 >
                   Earlier (-60 mins)
                 </button>
                 <button
-                  onClick={() => setWindowMins(60)}
+                  onClick={() => updateUrl({ window: 60, submitted: true })}
                   className="rounded-xl border border-zinc-700 px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800"
                 >
                   Later (+60 mins)
