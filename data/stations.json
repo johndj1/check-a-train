@@ -1,0 +1,12 @@
+[
+  { "name": "Sevenoaks", "code": "SEV" },
+  { "name": "London Bridge", "code": "LBG" },
+  { "name": "London Charing Cross", "code": "CHX" },
+  { "name": "London Cannon Street", "code": "CST" },
+  { "name": "Waterloo East", "code": "WAE" },
+  { "name": "Tunbridge Wells", "code": "TBW" },
+  { "name": "Tonbridge", "code": "TON" },
+  { "name": "Orpington", "code": "ORP" },
+  { "name": "Bromley South", "code": "BMS" },
+  { "name": "Victoria", "code": "VIC" }
+]

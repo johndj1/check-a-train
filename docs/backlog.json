@@ -1,0 +1,294 @@
+{
+  "version": 2,
+  "updated": "2026-03-03",
+  "stories": [
+    {
+      "id": "PB-001",
+      "title": "Create product definition document",
+      "status": "done",
+      "priority": "high",
+      "acceptance": [
+        "docs/product.md exists",
+        "Problem, vision and MVP defined",
+        "Workflow documented"
+      ]
+    },
+    {
+      "id": "PB-002",
+      "title": "Create machine-readable backlog",
+      "status": "done",
+      "priority": "high",
+      "acceptance": [
+        "docs/backlog.json exists",
+        "Stories stored as structured JSON",
+        "Repo acts as source of truth"
+      ]
+    },
+    {
+      "id": "PB-003",
+      "title": "Record architectural decisions",
+      "status": "done",
+      "priority": "medium",
+      "acceptance": [
+        "docs/decisions.md exists",
+        "Initial ADRs recorded"
+      ]
+    },
+
+    {
+      "id": "JR-001",
+      "title": "Introduce Journey + Leg domain model",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [],
+      "acceptance": [
+        "Journey type supports 1+ legs",
+        "Journey.delayMins computed from final planned vs expected arrival",
+        "Shared types used by API and UI",
+        "Existing UI continues to render"
+      ]
+    },
+    {
+      "id": "JR-002",
+      "title": "Define stable Journey API contract (v1)",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": ["JR-001"],
+      "acceptance": [
+        "/api/journeys always returns JSON",
+        "Response includes journeys array",
+        "Validation errors return 400",
+        "No secrets leaked in response"
+      ]
+    },
+    {
+      "id": "JR-003",
+      "title": "Integrate TransportAPI journey planner endpoint",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": ["JR-001", "JR-002"],
+      "acceptance": [
+        "Multi-leg journeys returned when available",
+        "Legs correctly mapped to domain model",
+        "Graceful handling when upstream plan unavailable"
+      ]
+    },
+
+    {
+      "id": "DR-001",
+      "title": "Search journeys around departure time",
+      "status": "done",
+      "priority": "high",
+      "acceptance": [
+        "User enters stations and time",
+        "Results shown ±30 minutes",
+        "Earlier/Later controls adjust time"
+      ]
+    },
+    {
+      "id": "DR-002",
+      "title": "Station typeahead selection",
+      "status": "done",
+      "priority": "high",
+      "acceptance": [
+        "Stations selectable via dropdown",
+        "Free text prevented",
+        "CRS codes stored"
+      ]
+    },
+    {
+      "id": "DR-003",
+      "title": "Integrate live rail running data",
+      "status": "ready",
+      "priority": "highest",
+      "dependencies": ["JR-002"],
+      "acceptance": [
+        "Replace mock journeys API",
+        "Fetch real train running data",
+        "Handle delays and cancellations"
+      ]
+    },
+    {
+      "id": "DR-004",
+      "title": "Calculate Delay Repay eligibility",
+      "status": "ready",
+      "priority": "highest",
+      "dependencies": ["JR-001"],
+      "acceptance": [
+        "Delay minutes calculated from final arrival",
+        "Eligibility threshold applied",
+        "Cancelled journeys auto eligible"
+      ]
+    },
+    {
+      "id": "DR-005",
+      "title": "Journey cards with expandable details",
+      "status": "building",
+      "priority": "high",
+      "dependencies": ["JR-001"],
+      "acceptance": [
+        "Each journey rendered as card",
+        "Expandable drawer shows leg breakdown",
+        "Mobile readable layout"
+      ]
+    },
+    {
+      "id": "DR-006",
+      "title": "Operator Delay Repay handoff",
+      "status": "idea",
+      "priority": "high",
+      "dependencies": ["DR-004"],
+      "acceptance": [
+        "Operator identified from journey",
+        "Correct claim page linked",
+        "Journey details passed where possible"
+      ]
+    },
+
+    {
+      "id": "SEC-001",
+      "title": "Validate and normalise all user inputs",
+      "status": "ready",
+      "priority": "highest",
+      "acceptance": [
+        "Station inputs validated server-side",
+        "Date/time validated",
+        "Malformed queries rejected",
+        "API never trusts client input"
+      ]
+    },
+    {
+      "id": "SEC-002",
+      "title": "Prevent cross-site scripting (XSS)",
+      "status": "ready",
+      "priority": "highest",
+      "acceptance": [
+        "No dangerouslySetInnerHTML usage",
+        "External data rendered as text",
+        "Script injection attempts do not execute"
+      ]
+    },
+    {
+      "id": "SEC-003",
+      "title": "Add rate limiting to API routes",
+      "status": "ready",
+      "priority": "high",
+      "acceptance": [
+        "Requests limited per IP",
+        "HTTP 429 returned when exceeded",
+        "Limit configurable"
+      ]
+    },
+    {
+      "id": "SEC-004",
+      "title": "Keep API secrets server-side only",
+      "status": "ready",
+      "priority": "highest",
+      "acceptance": [
+        "Secrets stored in environment variables",
+        "No secrets shipped to browser",
+        "External APIs accessed only server-side"
+      ]
+    },
+    {
+      "id": "SEC-005",
+      "title": "Add baseline security headers",
+      "status": "ready",
+      "priority": "high",
+      "acceptance": [
+        "Content-Security-Policy enabled",
+        "X-Frame-Options DENY",
+        "X-Content-Type-Options nosniff",
+        "Referrer policy set"
+      ]
+    },
+    {
+      "id": "SEC-006",
+      "title": "Validate outbound operator links",
+      "status": "idea",
+      "priority": "high",
+      "acceptance": [
+        "Operator URLs from allowlist",
+        "User input cannot alter redirect target"
+      ]
+    },
+    {
+      "id": "SEC-007",
+      "title": "Safe request logging without PII",
+      "status": "idea",
+      "priority": "medium",
+      "acceptance": [
+        "Errors logged",
+        "No personal data stored",
+        "Logs removable without impact"
+      ]
+    },
+    {
+      "id": "SEC-008",
+      "title": "Run MVP red-team checklist",
+      "status": "idea",
+      "priority": "highest",
+      "acceptance": [
+        "XSS tested",
+        "API abuse tested",
+        "Secrets verified absent",
+        "Findings documented"
+      ]
+    },
+
+    {
+      "id": "EXP-001",
+      "title": "User accounts for saved journeys",
+      "status": "idea",
+      "priority": "low",
+      "acceptance": [
+        "User can save regular journeys",
+        "Journeys retrievable later"
+      ]
+    },
+    {
+      "id": "EXP-002",
+      "title": "Delay alerts for saved journeys",
+      "status": "idea",
+      "priority": "low",
+      "acceptance": [
+        "User notified when delays detected",
+        "Alerts configurable"
+      ]
+    },
+    {
+      "id": "SEC-009",
+      "title": "Hide stack traces in production API responses",
+      "status": "ready",
+      "priority": "high",
+      "acceptance": [
+        "Stack traces only returned when NODE_ENV=development",
+        "Production API responses never expose internal stack information",
+        "Error payloads remain valid JSON"
+      ]
+    },
+    {
+      "id": "SEC-010",
+      "title": "Validate station CRS codes server-side in journeys API",
+      "status": "ready",
+      "priority": "highest",
+      "acceptance": [
+        "Only allow CRS codes from known station index",
+        "Reject unknown or malformed station codes with 400",
+        "API does not trust client-provided station codes"
+      ]
+    },
+    {
+      "id": "SEC-011",
+      "title": "Implement server-side input validation for date and time",
+      "status": "ready",
+      "priority": "high",
+      "acceptance": [
+        "Date must match YYYY-MM-DD format",
+        "Time must match HH:MM 24-hour format",
+        "Invalid date/time rejected with 400 response",
+        "API does not rely on client validation"
+      ]
+    }
+  ]
+}
