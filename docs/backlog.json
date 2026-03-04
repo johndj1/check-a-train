@@ -98,6 +98,23 @@
       "epic": "Journey Model"
     },
     {
+      "id": "JR-004",
+      "title": "Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "Top-line card shows departure time from the first leg (or selected leg if user picked one)",
+        "Top-line card shows arrival time from the final leg (or selected leg)",
+        "No bogus fallback where dep==arr when arrival is unknown",
+        "If arrival is unavailable, UI shows \"—\" and status is not forced to \"On time\""
+      ],
+      "epic": "Journey Model"
+    },
+    {
       "id": "UI-001",
       "title": "Service cards + expandable details drawer",
       "status": "done",
@@ -131,6 +148,19 @@
         "If the API returns a non-JSON response or 5xx, show a user-friendly error message (no stack trace exposure).",
         "If the API returns 400 validation errors, show the specific validation message to the user.",
         "Errors are rendered in the existing error banner area (no layout break, no console spam required)."
+      ],
+      "epic": "User Interface"
+    },
+    {
+      "id": "UI-003",
+      "title": "Replace status default 'On time' with 'Unknown' when realtime fields missing",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [],
+      "acceptance": [
+        "If expected times/status cannot be derived, status renders as \"Unknown\"",
+        "\"On time\" is only shown when data supports it (e.g., explicit on-time or expected==aimed)",
+        "ServiceCard renders gracefully for missing fields without crashing"
       ],
       "epic": "User Interface"
     },
@@ -294,6 +324,22 @@
       "epic": "Delay Repay",
       "supersededBy": "DR-002",
       "notes": "Superseded by DR-002. Do not implement separately."
+    },
+    {
+      "id": "DR-010",
+      "title": "Map cancelled / no-report states into service model and display",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": [
+        "DR-003"
+      ],
+      "acceptance": [
+        "Internal status model supports Cancelled and No report / Not reporting (or equivalent)",
+        "UI displays Cancelled clearly and does not show delay mins for cancelled unless rules define it",
+        "API mapping sets the correct status when upstream indicates cancellation or no-report",
+        "Copy-details includes status text for the selected service/leg"
+      ],
+      "epic": "Delay Repay"
     },
     {
       "id": "SEC-001",

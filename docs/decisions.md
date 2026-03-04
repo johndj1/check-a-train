@@ -41,3 +41,33 @@ Before automatic close logic runs, validation must pass in this order:
 Rule:
 - If any validation step fails, backlog automation must not modify `docs/backlog.json`.
 - This behavior is local-only via git hooks and is not server-enforced.
+
+## Decision: Commit-driven documentation and backlog automation
+
+The repository uses a commit-driven automation workflow to keep product
+documentation in sync with development work.
+
+When docs/backlog.json is committed, a local Git hook runs several steps
+to validate the repository and regenerate derived documentation.
+
+Workflow:
+
+commit backlog.json
+↓
+validate (lint + typecheck + build)
+↓
+close stories referenced in commit messages
+↓
+regenerate docs (roadmap + changelog)
+↓
+auto-commit generated docs
+
+Notes:
+- Validation must pass before backlog automation runs.
+- Generated docs (roadmap.md and CHANGELOG.md) are committed automatically.
+- Backlog edits are always committed manually.
+- The hook uses a recursion guard so the docs auto-commit does not trigger itself again.
+
+Purpose:
+This workflow ensures the roadmap and changelog are always consistent with
+the backlog and commit history, while keeping commits explicit and safe.
