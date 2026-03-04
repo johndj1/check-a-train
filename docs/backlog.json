@@ -6,35 +6,51 @@
       "id": "PB-001",
       "title": "Create product definition document",
       "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "high",
+      "dependencies": [],
       "acceptance": [
-        "docs/product.md exists",
-        "Problem, vision and MVP defined",
-        "Workflow documented"
-      ]
+        "docs/product.md exists in the repository",
+        "Document includes problem statement, vision, and MVP scope",
+        "Document includes a clear user workflow section"
+      ],
+      "epic": "Product Foundations"
     },
     {
       "id": "PB-002",
       "title": "Create machine-readable backlog",
       "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "high",
+      "dependencies": [
+        "PB-001"
+      ],
       "acceptance": [
-        "docs/backlog.json exists",
-        "Stories stored as structured JSON",
-        "Repo acts as source of truth"
-      ]
+        "docs/backlog.json exists in the repository",
+        "Backlog entries are valid JSON objects in a stories array",
+        "JSON parses successfully with a standard validator"
+      ],
+      "epic": "Product Foundations"
     },
     {
       "id": "PB-003",
       "title": "Record architectural decisions",
       "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "medium",
+      "dependencies": [
+        "PB-001"
+      ],
       "acceptance": [
-        "docs/decisions.md exists",
-        "Initial ADRs recorded"
-      ]
+        "docs/decisions.md exists in the repository",
+        "At least one architecture decision is documented with rationale",
+        "Decision entries are readable and version-controlled"
+      ],
+      "epic": "Product Foundations"
     },
-
     {
       "id": "JR-001",
       "title": "Introduce Journey + Leg domain model",
@@ -42,252 +58,490 @@
       "priority": "highest",
       "dependencies": [],
       "acceptance": [
-        "Journey type supports 1+ legs",
-        "Journey.delayMins computed from final planned vs expected arrival",
-        "Shared types used by API and UI",
-        "Existing UI continues to render"
-      ]
+        "Journey type supports one or more ordered legs",
+        "Journey delayMins is computed from final planned arrival versus final expected arrival",
+        "Shared journey/leg types are imported by both API and UI modules",
+        "Existing search page renders without runtime errors after type migration"
+      ],
+      "epic": "Journey Model"
     },
     {
       "id": "JR-002",
       "title": "Define stable Journey API contract (v1)",
       "status": "todo",
       "priority": "highest",
-      "dependencies": ["JR-001"],
+      "dependencies": [
+        "JR-001"
+      ],
       "acceptance": [
-        "/api/journeys always returns JSON",
-        "Response includes journeys array",
-        "Validation errors return 400",
-        "No secrets leaked in response"
-      ]
+        "/api/journeys returns JSON for both success and error paths",
+        "Successful response includes a top-level journeys array",
+        "Validation errors return HTTP 400 with a structured error body",
+        "Responses do not include secrets or credentials"
+      ],
+      "epic": "Journey Model"
     },
     {
       "id": "JR-003",
       "title": "Integrate TransportAPI journey planner endpoint",
       "status": "todo",
       "priority": "high",
-      "dependencies": ["JR-001", "JR-002"],
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
       "acceptance": [
-        "Multi-leg journeys returned when available",
-        "Legs correctly mapped to domain model",
-        "Graceful handling when upstream plan unavailable"
-      ]
+        "Journey planner integration returns multi-leg journeys when upstream data provides them",
+        "Upstream journey legs are mapped into the internal Journey + Leg model",
+        "If upstream planning fails, API returns a controlled error JSON response"
+      ],
+      "epic": "Journey Model"
     },
-
+    {
+      "id": "UI-001",
+      "title": "Service cards + expandable details drawer",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "Results render as service cards (no horizontal scrolling)",
+        "Each service supports expand/collapse drawer",
+        "Collapsed view shows: depart time, arrive time (if known), operator, platform (if known), status",
+        "Expanded drawer shows: calling points (when available), UID/service id, aimed vs expected times, delay mins",
+        "Mobile layout remains readable"
+      ],
+      "epic": "User Interface"
+    },
+    {
+      "id": "UI-002",
+      "title": "Graceful offline + network error handling",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-002"
+      ],
+      "acceptance": [
+        "If the browser is offline or the fetch fails, the UI shows a friendly message (no red dev overlay in production).",
+        "Show a clear Retry button that re-runs the search without losing the current form/URL state.",
+        "If the API returns a non-JSON response or 5xx, show a user-friendly error message (no stack trace exposure).",
+        "If the API returns 400 validation errors, show the specific validation message to the user.",
+        "Errors are rendered in the existing error banner area (no layout break, no console spam required)."
+      ],
+      "epic": "User Interface"
+    },
     {
       "id": "DR-001",
-      "title": "Search journeys around departure time",
-      "status": "done",
-      "priority": "high",
+      "title": "Multi-leg journeys + choose delayed leg (or whole journey)",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
       "acceptance": [
-        "User enters stations and time",
-        "Results shown ±30 minutes",
-        "Earlier/Later controls adjust time"
-      ]
+        "Journey supports 1+ legs in UI rendering",
+        "User can choose 'whole journey' or a specific leg as the delayed segment",
+        "Selection is persisted in URL params (shareable)",
+        "Chosen segment drives delay mins shown for Delay Repay handoff"
+      ],
+      "epic": "Delay Repay"
     },
     {
       "id": "DR-002",
-      "title": "Station typeahead selection",
-      "status": "done",
-      "priority": "high",
+      "title": "Delay Repay handoff by operator + copy-pack",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [
+        "DR-001"
+      ],
       "acceptance": [
-        "Stations selectable via dropdown",
-        "Free text prevented",
-        "CRS codes stored"
-      ]
+        "Operator is displayed for the selected segment/service",
+        "User sees a 'Claim Delay Repay' button that opens the correct operator claim page",
+        "UI provides a copy-pack of key fields: from/to, date, planned times, expected times (if available), delay mins, service UID",
+        "If operator mapping is missing, UI shows a clear fallback path (generic guidance) without breaking"
+      ],
+      "epic": "Delay Repay"
     },
     {
       "id": "DR-003",
       "title": "Integrate live rail running data",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
-      "dependencies": ["JR-002"],
+      "dependencies": [
+        "JR-002",
+        "SEC-010",
+        "SEC-011"
+      ],
       "acceptance": [
-        "Replace mock journeys API",
-        "Fetch real train running data",
-        "Handle delays and cancellations"
-      ]
+        "API uses live rail provider data instead of mock journey data",
+        "Delayed and cancelled services are represented in API response fields",
+        "Upstream errors are returned as controlled JSON without server stack details"
+      ],
+      "epic": "Delay Repay"
     },
     {
       "id": "DR-004",
       "title": "Calculate Delay Repay eligibility",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
-      "dependencies": ["JR-001"],
+      "dependencies": [
+        "JR-001",
+        "DR-003"
+      ],
       "acceptance": [
-        "Delay minutes calculated from final arrival",
-        "Eligibility threshold applied",
-        "Cancelled journeys auto eligible"
-      ]
+        "Delay minutes are calculated from final journey arrival delta",
+        "Eligibility threshold rules produce a deterministic eligibility state",
+        "Cancelled journeys are marked eligible according to configured rules"
+      ],
+      "epic": "Delay Repay"
     },
     {
       "id": "DR-005",
       "title": "Journey cards with expandable details",
-      "status": "building",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "high",
-      "dependencies": ["JR-001"],
+      "dependencies": [
+        "UI-001"
+      ],
       "acceptance": [
-        "Each journey rendered as card",
-        "Expandable drawer shows leg breakdown",
-        "Mobile readable layout"
-      ]
+        "Legacy implementation plan is reconciled with UI-001 card and drawer design",
+        "No duplicate card components remain after consolidation",
+        "Journey card interactions are covered by component-level tests"
+      ],
+      "epic": "Delay Repay",
+      "supersededBy": "UI-001",
+      "notes": "Superseded by UI-001. Do not implement separately."
     },
     {
       "id": "DR-006",
       "title": "Operator Delay Repay handoff",
-      "status": "idea",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "high",
-      "dependencies": ["DR-004"],
+      "dependencies": [
+        "DR-002"
+      ],
       "acceptance": [
-        "Operator identified from journey",
-        "Correct claim page linked",
-        "Journey details passed where possible"
-      ]
+        "Legacy handoff flow is merged into DR-002 without conflicting UI actions",
+        "Operator handoff uses a single mapping source of truth",
+        "Regression tests verify claim-link behavior for mapped and unmapped operators"
+      ],
+      "epic": "Delay Repay",
+      "supersededBy": "DR-002",
+      "notes": "Superseded by DR-002. Do not implement separately."
     },
-
+    {
+      "id": "DR-007",
+      "title": "Service cards with expandable details drawer",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
+      "priority": "high",
+      "dependencies": [
+        "UI-001"
+      ],
+      "acceptance": [
+        "Backlog alignment confirms UI-001 is the canonical implementation story",
+        "Any duplicate implementation tasks are linked to UI-001 and not executed independently",
+        "UI behavior and acceptance for cards/drawers matches UI-001 criteria"
+      ],
+      "epic": "Delay Repay",
+      "supersededBy": "UI-001",
+      "notes": "Superseded by UI-001. Do not implement separately."
+    },
+    {
+      "id": "DR-008",
+      "title": "Multi-leg journey capture and delayed-leg selection",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
+      "priority": "high",
+      "dependencies": [
+        "DR-001"
+      ],
+      "acceptance": [
+        "Backlog alignment confirms DR-001 is the canonical multi-leg selection story",
+        "No conflicting delayed-segment state model exists outside DR-001",
+        "Links and references point engineering work to DR-001 acceptance criteria"
+      ],
+      "epic": "Delay Repay",
+      "supersededBy": "DR-001",
+      "notes": "Superseded by DR-001. Do not implement separately."
+    },
+    {
+      "id": "DR-009",
+      "title": "Delay Repay handoff by operator with copy-pack",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
+      "priority": "high",
+      "dependencies": [
+        "DR-002"
+      ],
+      "acceptance": [
+        "Backlog alignment confirms DR-002 is the canonical operator handoff story",
+        "No duplicate copy-pack payload definitions remain outside DR-002",
+        "All follow-up work references DR-002 as implementation source"
+      ],
+      "epic": "Delay Repay",
+      "supersededBy": "DR-002",
+      "notes": "Superseded by DR-002. Do not implement separately."
+    },
     {
       "id": "SEC-001",
       "title": "Validate and normalise all user inputs",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
+      "dependencies": [],
       "acceptance": [
-        "Station inputs validated server-side",
-        "Date/time validated",
-        "Malformed queries rejected",
-        "API never trusts client input"
-      ]
+        "Station inputs are validated server-side before provider requests",
+        "Date/time inputs are normalized and invalid values return HTTP 400",
+        "Malformed queries do not reach upstream providers",
+        "API never trusts client input for security-sensitive fields"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-002",
       "title": "Prevent cross-site scripting (XSS)",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
+      "dependencies": [],
       "acceptance": [
-        "No dangerouslySetInnerHTML usage",
-        "External data rendered as text",
-        "Script injection attempts do not execute"
-      ]
+        "No dangerouslySetInnerHTML usage is present in the application code",
+        "Untrusted external data is rendered as escaped text",
+        "Automated test cases verify injected script strings do not execute"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-003",
       "title": "Add rate limiting to API routes",
-      "status": "ready",
+      "status": "todo",
       "priority": "high",
+      "dependencies": [],
       "acceptance": [
-        "Requests limited per IP",
-        "HTTP 429 returned when exceeded",
-        "Limit configurable"
-      ]
+        "Requests are limited per client IP within a configured window",
+        "Exceeded limits return HTTP 429 with JSON error payload",
+        "Rate limit thresholds are configurable via environment variables"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-004",
       "title": "Keep API secrets server-side only",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
+      "dependencies": [],
       "acceptance": [
-        "Secrets stored in environment variables",
-        "No secrets shipped to browser",
-        "External APIs accessed only server-side"
-      ]
+        "Transport API credentials are loaded only from server-side environment variables",
+        "No secret values are present in client bundles or API responses",
+        "External provider calls are executed only on the server"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-005",
       "title": "Add baseline security headers",
-      "status": "ready",
+      "status": "todo",
       "priority": "high",
+      "dependencies": [
+        "SEC-004"
+      ],
       "acceptance": [
-        "Content-Security-Policy enabled",
-        "X-Frame-Options DENY",
-        "X-Content-Type-Options nosniff",
-        "Referrer policy set"
-      ]
+        "Responses include Content-Security-Policy header",
+        "Responses include X-Frame-Options: DENY",
+        "Responses include X-Content-Type-Options: nosniff",
+        "Responses include a strict referrer policy"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-006",
       "title": "Validate outbound operator links",
-      "status": "idea",
+      "status": "todo",
       "priority": "high",
+      "dependencies": [
+        "DR-002"
+      ],
       "acceptance": [
-        "Operator URLs from allowlist",
-        "User input cannot alter redirect target"
-      ]
+        "Operator claim URLs are resolved from an allowlisted mapping",
+        "User-controlled input cannot alter redirect destination",
+        "Unmapped operators return a safe fallback guidance route"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-007",
       "title": "Safe request logging without PII",
-      "status": "idea",
+      "status": "todo",
       "priority": "medium",
+      "dependencies": [],
       "acceptance": [
-        "Errors logged",
-        "No personal data stored",
-        "Logs removable without impact"
-      ]
+        "Error and request logs exclude personal data fields",
+        "Structured logs include timestamp, route, and status code",
+        "Logging can be disabled or redacted via configuration"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-008",
       "title": "Run MVP red-team checklist",
-      "status": "idea",
+      "status": "todo",
       "priority": "highest",
+      "dependencies": [
+        "SEC-001",
+        "SEC-002",
+        "SEC-003",
+        "SEC-004",
+        "SEC-005",
+        "SEC-006",
+        "SEC-009",
+        "SEC-010",
+        "SEC-011"
+      ],
       "acceptance": [
-        "XSS tested",
-        "API abuse tested",
-        "Secrets verified absent",
-        "Findings documented"
-      ]
-    },
-
-    {
-      "id": "EXP-001",
-      "title": "User accounts for saved journeys",
-      "status": "idea",
-      "priority": "low",
-      "acceptance": [
-        "User can save regular journeys",
-        "Journeys retrievable later"
-      ]
-    },
-    {
-      "id": "EXP-002",
-      "title": "Delay alerts for saved journeys",
-      "status": "idea",
-      "priority": "low",
-      "acceptance": [
-        "User notified when delays detected",
-        "Alerts configurable"
-      ]
+        "Checklist includes XSS, API abuse, secret exposure, and link-manipulation scenarios",
+        "Each scenario has a pass/fail result recorded in docs/security.md",
+        "All high-severity findings are resolved or tracked with explicit follow-up stories"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-009",
       "title": "Hide stack traces in production API responses",
-      "status": "ready",
+      "status": "done",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "high",
+      "dependencies": [],
       "acceptance": [
-        "Stack traces only returned when NODE_ENV=development",
-        "Production API responses never expose internal stack information",
-        "Error payloads remain valid JSON"
-      ]
+        "Stack traces are returned only when NODE_ENV is development",
+        "Production API error responses do not expose internal stack details",
+        "Error responses remain valid JSON in all environments"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-010",
       "title": "Validate station CRS codes server-side in journeys API",
-      "status": "ready",
+      "status": "todo",
       "priority": "highest",
+      "dependencies": [],
       "acceptance": [
-        "Only allow CRS codes from known station index",
-        "Reject unknown or malformed station codes with 400",
-        "API does not trust client-provided station codes"
-      ]
+        "Only CRS codes present in the known station index are accepted",
+        "Unknown or malformed station codes return HTTP 400",
+        "Server-side validation runs regardless of client-side checks"
+      ],
+      "epic": "Security"
     },
     {
       "id": "SEC-011",
       "title": "Implement server-side input validation for date and time",
-      "status": "ready",
+      "status": "todo",
       "priority": "high",
+      "dependencies": [],
       "acceptance": [
-        "Date must match YYYY-MM-DD format",
-        "Time must match HH:MM 24-hour format",
-        "Invalid date/time rejected with 400 response",
-        "API does not rely on client validation"
+        "Date input must match YYYY-MM-DD format",
+        "Time input must match HH:MM 24-hour format",
+        "Invalid date or time values return HTTP 400",
+        "Validation is enforced server-side without relying on client validation"
+      ],
+      "epic": "Security"
+    },
+    {
+      "id": "EXP-001",
+      "title": "User accounts for saved journeys",
+      "status": "todo",
+      "priority": "low",
+      "dependencies": [
+        "DR-001"
+      ],
+      "acceptance": [
+        "Authenticated user can save a journey from search results",
+        "Saved journeys are listed on a dedicated user view",
+        "User can delete a saved journey and list updates immediately"
+      ],
+      "epic": "Experiments"
+    },
+    {
+      "id": "EXP-002",
+      "title": "Delay alerts for saved journeys",
+      "status": "todo",
+      "priority": "low",
+      "dependencies": [
+        "EXP-001",
+        "DR-003"
+      ],
+      "acceptance": [
+        "User can enable or disable delay alerts per saved journey",
+        "Alert event is generated when delay threshold is exceeded",
+        "User receives alert payload containing journey and delay summary"
+      ],
+      "epic": "Experiments"
+    },
+    {
+      "id": "DEV-001",
+      "title": "Codex commit helper (safe mode: no auto-commit until tests pass)",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [],
+      "acceptance": [
+        "Codex can stage specific files using git add",
+        "Codex can generate a proposed commit message based on staged diff",
+        "Codex runs validation commands before suggesting commit (npm run lint, npx tsc --noEmit, npm run build)",
+        "Codex will NOT run git commit unless validation passes and the user explicitly confirms",
+        "Codex never stages or commits .env or secret files",
+        "Validation results are displayed clearly before commit suggestion"
+      ],
+      "epic": "Developer Experience"
+    },
+    {
+      "id": "DEV-002",
+      "title": "Auto-close backlog stories from commit messages",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": [
+        "DEV-001"
+      ],
+      "acceptance": [
+        "Commit messages referencing story IDs are detected",
+        "Referenced stories are automatically marked done in docs/backlog.json",
+        "completedAt is set automatically",
+        "Backlog remains valid JSON after update"
+      ],
+      "epic": "Developer Experience"
+    },
+    {
+      "id": "ST-001",
+      "title": "Replace local station dataset with national station index",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [],
+      "acceptance": [
+        "Application supports searching all UK stations",
+        "Station typeahead queries national station dataset",
+        "Dataset includes CRS code and station name",
+        "Existing station typeahead UI continues to function"
+      ]
+    },
+    {
+      "id": "INF-001",
+      "title": "Introduce CI/CD pipeline for build and deployment",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": [],
+      "acceptance": [
+        "GitHub Actions pipeline runs on push",
+        "Pipeline runs lint, typecheck, and build",
+        "Successful builds trigger deployment",
+        "Failed builds block deployment"
       ]
     }
   ]

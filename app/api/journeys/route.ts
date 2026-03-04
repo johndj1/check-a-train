@@ -33,6 +33,10 @@ function asStatus(s: string | null | undefined): "On time" | "Delayed" | "Cancel
   return "On time";
 }
 
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null;
+}
+
 export async function GET(req: Request) {
   try {
     console.log("✅ /api/journeys hit");
@@ -73,12 +77,17 @@ export async function GET(req: Request) {
     const raw = await res.text();
 
     const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
-    const data = isJson ? (JSON.parse(raw) as any) : null;
+    const data: unknown = isJson ? JSON.parse(raw) : null;
+    const dataObj = isRecord(data) ? data : null;
+    const errorMessage =
+      dataObj && typeof dataObj.error === "string"
+        ? dataObj.error
+        : "TransportAPI request failed";
 
     if (!res.ok) {
       return NextResponse.json(
         {
-          error: data?.error ?? "TransportAPI request failed",
+          error: errorMessage,
           upstreamStatus: res.status,
           upstream: data ?? raw.slice(0, 500),
         },
@@ -86,29 +95,33 @@ export async function GET(req: Request) {
       );
     }
 
-    const rows: any[] = Array.isArray(data?.departures?.all) ? data.departures.all : [];
+    const departures = dataObj?.departures;
+    const departureObj = isRecord(departures) ? departures : null;
+    const rows: unknown[] = Array.isArray(departureObj?.all) ? departureObj.all : [];
+    const stationName = typeof dataObj?.station_name === "string" ? dataObj.station_name : null;
 
     const services = rows.map((r) => {
-      const aimed = r.aimed_departure_time ?? null;
-      const expected = r.expected_departure_time ?? null;
+      const row = isRecord(r) ? r : {};
+      const aimed = row.aimed_departure_time ?? null;
+      const expected = row.expected_departure_time ?? null;
 
       const delayMins =
         aimed && expected ? diffMins(String(aimed), String(expected)) : null;
 
       return {
-        uid: String(r.train_uid ?? r.service ?? `${r.operator ?? ""}-${aimed ?? ""}`),
-        operator: r.operator ?? null,
-        operatorName: String(r.operator_name ?? r.operator ?? "Unknown"),
-        platform: r.platform ?? null,
+        uid: String(row.train_uid ?? row.service ?? `${row.operator ?? ""}-${aimed ?? ""}`),
+        operator: row.operator ?? null,
+        operatorName: String(row.operator_name ?? row.operator ?? "Unknown"),
+        platform: row.platform ?? null,
 
-        originName: String(r.origin_name ?? data?.station_name ?? from),
-        destinationName: String(r.destination_name ?? ""),
+        originName: String(row.origin_name ?? stationName ?? from),
+        destinationName: String(row.destination_name ?? ""),
 
         aimedDeparture: String(aimed ?? ""),
         expectedDeparture: expected ? String(expected) : null,
         delayMins,
 
-        status: asStatus(r.status),
+        status: asStatus(typeof row.status === "string" ? row.status : null),
         callsAtTo: undefined, // we'll compute this later (Darwin / timetable)
       };
     });
@@ -122,11 +135,15 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     console.error("❌ /api/journeys error:", e);
+    const isDev = process.env.NODE_ENV === "development";
+    const body: { error: string; stack?: string } = {
+      error: (e as Error).message ?? "Server error",
+    };
+    if (isDev) {
+      body.stack = (e as Error).stack ?? "";
+    }
     return NextResponse.json(
-      {
-        error: (e as Error).message ?? "Server error",
-        stack: (e as Error).stack ?? null, // dev-only usefulness
-      },
+      body,
       { status: 500 }
     );
   }
