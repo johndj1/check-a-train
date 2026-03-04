@@ -115,6 +115,25 @@
       "epic": "Journey Model"
     },
     {
+      "id": "JR-005",
+      "title": "Derive service status from planned vs expected times",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "Delay minutes are calculated from expected arrival minus aimed arrival",
+        "If delay minutes > 0 the service status renders as \"Delayed\"",
+        "If expected time equals aimed time status renders as \"On time\"",
+        "If expected time is missing status renders as \"Unknown\"",
+        "Cancelled services render status \"Cancelled\"",
+        "ServiceCard status pill updates correctly from the derived status"
+      ],
+      "epic": "Journey Model"
+    },
+    {
       "id": "UI-001",
       "title": "Service cards + expandable details drawer",
       "status": "done",
