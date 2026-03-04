@@ -100,7 +100,7 @@
     {
       "id": "JR-004",
       "title": "Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg",
-      "status": "todo",
+      "status": "done",
       "priority": "high",
       "dependencies": [
         "JR-001",
@@ -112,7 +112,9 @@
         "No bogus fallback where dep==arr when arrival is unknown",
         "If arrival is unavailable, UI shows \"—\" and status is not forced to \"On time\""
       ],
-      "epic": "Journey Model"
+      "epic": "Journey Model",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04"
     },
     {
       "id": "JR-005",

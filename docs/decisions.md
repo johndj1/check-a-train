@@ -13,21 +13,44 @@ Reason:
 
 ## ADR-003: Mock-first development
 Mock APIs used initially to enable fast UI iteration before live integration.
-## ADR-004: Local git hooks for generated docs
-We use a local-only post-commit hook to regenerate docs/roadmap.md
-and docs/CHANGELOG.md from docs/backlog.json.
 
-Reason:
-- keeps roadmap/changelog aligned with backlog metadata
-- does not require CI or shared hook tooling
-- optional and local to each developer machine
+## ADR-004 — Automated backlog-driven documentation
 
-Note:
-- .git/hooks is not version-controlled, so this setup is local-only by design.
-- Hook execution is optional and local-only by design.
-- Hook runs only when docs/backlog.json or docs/product.md changed in the commit.
-- Hook prints a warning on regeneration errors and never blocks the commit.
-- Hook never runs git add, git commit, or git push.
+### Context
+The repository uses a machine-readable backlog (`docs/backlog.json`) as the source of truth for product work.
+
+Previously, documentation such as the roadmap and changelog had to be manually updated when backlog items changed.
+
+### Decision
+Commits that modify `docs/backlog.json` trigger automated validation and documentation regeneration.
+
+The workflow is:
+
+commit backlog.json  
+↓  
+validate backlog structure  
+↓  
+close stories referenced in commit messages  
+↓  
+regenerate documentation (roadmap + changelog)  
+↓  
+auto-commit updated docs
+
+### Rationale
+This ensures:
+
+- The backlog remains the **single source of truth**
+- Roadmap and changelog stay **synchronised automatically**
+- Documentation drift is prevented
+- The repo behaves like a lightweight product management system
+
+### Consequences
+Pros:
+- Reduced manual documentation maintenance
+- Improved traceability between commits, stories, and roadmap
+
+Cons:
+- Git hooks introduce additional automation that must be maintained
 
 ## ADR-005: Commit-message driven backlog close with validation gate
 Done-story transitions can be inferred from commit messages that include story IDs
