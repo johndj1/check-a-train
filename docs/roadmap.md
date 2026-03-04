@@ -1,8 +1,8 @@
 # Product Roadmap
 
 ## Phase 1 — Foundations
-- PB-001 — Create product definition document — done
-- PB-002 — Create machine-readable backlog — done
+- PB-001 — Create product definition document — in-progress
+- PB-002 — Create machine-readable backlog — in-progress
 - PB-003 — Record architectural decisions — done
 
 ## Phase 2 — Journey Intelligence
