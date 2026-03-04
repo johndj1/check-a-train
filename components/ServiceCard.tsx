@@ -16,6 +16,7 @@ function formatDelay(delayMins: number | null) {
 function statusClass(status: Service["status"]) {
   if (status === "On time") return "text-zinc-200";
   if (status === "Delayed") return "text-amber-300";
+  if (status === "Unknown") return "text-zinc-400";
   return "text-red-300";
 }
 
@@ -35,7 +36,11 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const delayMins = typeof service.delayMins === "number" ? service.delayMins : null;
   const callsAtTo = service.callsAtTo;
   const status: Service["status"] =
-    service.status === "Delayed" || service.status === "Cancelled" ? service.status : "On time";
+    service.status === "Delayed" ||
+    service.status === "Cancelled" ||
+    service.status === "Unknown"
+      ? service.status
+      : "On time";
 
   const arrival = expectedDeparture ?? aimedDeparture;
 

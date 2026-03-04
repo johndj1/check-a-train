@@ -13,7 +13,7 @@ export type Service = {
   expectedDeparture: string | null; // HH:MM or null
   delayMins: number | null;
 
-  status: "On time" | "Delayed" | "Cancelled";
+  status: "On time" | "Delayed" | "Cancelled" | "Unknown";
   callsAtTo?: boolean;
 };
 

@@ -52,6 +52,22 @@
       "epic": "Product Foundations"
     },
     {
+      "id": "PROD-001",
+      "title": "Establish Delay Repay assistant as MVP product direction",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "PB-001"
+      ],
+      "acceptance": [
+        "docs/product.md states that the product is a Delay Repay assistant rather than a journey planner",
+        "Product scope prioritises station departures search, service selection, delay derivation, and operator claim handoff",
+        "Journey planner is documented as a future enhancement",
+        "Product roadmap reflects Phase A (departures-based MVP), Phase B (destination verification via service timetable), and Phase C (arrival-based delay using live running data such as Darwin)"
+      ],
+      "epic": "Product Foundations"
+    },
+    {
       "id": "JR-001",
       "title": "Introduce Journey + Leg domain model",
       "status": "todo",
@@ -136,6 +152,44 @@
       "epic": "Journey Model"
     },
     {
+      "id": "JR-006",
+      "title": "Switch /api/journeys to TransportAPI Journey Planner (from -> to)",
+      "status": "in-progress",
+      "startedAt": "2026-03-04",
+      "priority": "high",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "/api/journeys calls Journey Planner endpoint with from, to, date, time, service=train, live=true",
+        "API maps journey-planner response into the existing services array contract",
+        "API returns JSON on success and upstream error paths",
+        "UI renders distinct services for SEV -> LBG search"
+      ],
+      "epic": "Journey Model",
+      "notes": "Awaiting manual smoke test in local dev UI before marking done."
+    },
+    {
+      "id": "JR-007",
+      "title": "Fetch service timetable on card expand to confirm destination calling point",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "When a ServiceCard expands, the client fetches the service_timetable.id URL from TransportAPI",
+        "The response includes the list of calling stations for the service",
+        "The expanded card shows calling points",
+        "The app determines whether the train stops at the selected destination",
+        "If the timetable fetch fails, the card still renders without crashing",
+        "Timetable requests only occur when a card is expanded"
+      ],
+      "epic": "Journey Model"
+    },
+    {
       "id": "UI-001",
       "title": "Service cards + expandable details drawer",
       "status": "done",
@@ -182,6 +236,40 @@
         "If expected times/status cannot be derived, status renders as \"Unknown\"",
         "\"On time\" is only shown when data supports it (e.g., explicit on-time or expected==aimed)",
         "ServiceCard renders gracefully for missing fields without crashing"
+      ],
+      "epic": "User Interface"
+    },
+    {
+      "id": "UI-004",
+      "title": "Station search typeahead using full UK station list",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [],
+      "acceptance": [
+        "App includes a dataset containing all UK rail stations (CRS code and station name)",
+        "User can type a station name or CRS code into the search box",
+        "Matching stations appear as a typeahead dropdown",
+        "Selecting a station populates the CRS code used by the API",
+        "The dataset loads once and is cached client-side",
+        "The search works for all UK stations"
+      ],
+      "epic": "User Interface"
+    },
+    {
+      "id": "UI-005",
+      "title": "Auto-detect nearest station using browser geolocation",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "UI-004"
+      ],
+      "acceptance": [
+        "App requests browser geolocation permission",
+        "If granted, determine the nearest station from the station dataset",
+        "Automatically populate the From field with that station",
+        "If permission denied, user continues with manual station search",
+        "Geolocation runs once per session",
+        "No location data is stored server-side"
       ],
       "epic": "User Interface"
     },

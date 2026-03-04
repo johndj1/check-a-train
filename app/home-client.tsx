@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import StationTypeahead, { type Station } from "@/components/StationTypeahead";
+import { getStations, type Station } from "@/lib/stations";
 import { useJourneySearch } from "@/hooks/useJourneySearch";
 import ServiceCard from "@/components/ServiceCard";
 
@@ -55,6 +55,9 @@ export default function HomeClient() {
 
   const [fromCode, setFromCode] = useState<string>(sp.get("fromCode") ?? "");
   const [toCode, setToCode] = useState<string>(sp.get("toCode") ?? "");
+  const [stations, setStations] = useState<Station[]>([]);
+  const [fromOpen, setFromOpen] = useState(false);
+  const [toOpen, setToOpen] = useState(false);
 
   const windowMins = Number.isFinite(windowUrl) ? Math.min(Math.max(windowUrl, 15), 180) : 30;
 
@@ -73,6 +76,33 @@ export default function HomeClient() {
     time: timeUrl,
     windowMins,
   });
+
+  useEffect(() => {
+    let active = true;
+    getStations()
+      .then((all) => {
+        if (active) setStations(all);
+      })
+      .catch(() => {
+        if (active) setStations([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  function stationMatches(input: string) {
+    const q = input.trim().toLowerCase();
+    if (!q) return [];
+    return stations
+      .filter(
+        (s) => s.name.toLowerCase().includes(q) || s.crs.toLowerCase().includes(q)
+      )
+      .slice(0, 10);
+  }
+
+  const fromMatches = stationMatches(from);
+  const toMatches = stationMatches(to);
 
   // Keep codes synced from URL (so refresh/share works)
   useEffect(() => {
@@ -155,33 +185,91 @@ export default function HomeClient() {
 
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6 shadow-sm">
           <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <StationTypeahead
-              label="Departure station"
-              placeholder="e.g. Sevenoaks"
-              value={from}
-              onChange={(v) => {
-                setFrom(v);
-                setFromCode("");
-              }}
-              onSelect={(s: Station) => {
-                setFrom(s.name);
-                setFromCode(s.code);
-              }}
-            />
+            <div className="space-y-2">
+              <label className="text-sm text-zinc-300">Departure station</label>
+              <div className="relative">
+                <input
+                  value={from}
+                  onChange={(e) => {
+                    setFrom(e.target.value);
+                    setFromCode("");
+                    setFromOpen(true);
+                  }}
+                  onFocus={() => setFromOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setFromOpen(false), 120);
+                  }}
+                  placeholder="e.g. Sevenoaks"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-600"
+                  autoComplete="off"
+                />
+                {fromOpen && from.trim().length > 0 && (
+                  <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-lg">
+                    {fromMatches.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-zinc-400">No matches</div>
+                    )}
+                    {fromMatches.map((s) => (
+                      <button
+                        key={`from-${s.crs}`}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setFrom(s.name);
+                          setFromCode(s.crs);
+                          setFromOpen(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-900"
+                      >
+                        {s.name} ({s.crs})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
-            <StationTypeahead
-              label="Arrival station"
-              placeholder="e.g. London Bridge"
-              value={to}
-              onChange={(v) => {
-                setTo(v);
-                setToCode("");
-              }}
-              onSelect={(s: Station) => {
-                setTo(s.name);
-                setToCode(s.code);
-              }}
-            />
+            <div className="space-y-2">
+              <label className="text-sm text-zinc-300">Arrival station</label>
+              <div className="relative">
+                <input
+                  value={to}
+                  onChange={(e) => {
+                    setTo(e.target.value);
+                    setToCode("");
+                    setToOpen(true);
+                  }}
+                  onFocus={() => setToOpen(true)}
+                  onBlur={() => {
+                    window.setTimeout(() => setToOpen(false), 120);
+                  }}
+                  placeholder="e.g. London Bridge"
+                  className="w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-zinc-600"
+                  autoComplete="off"
+                />
+                {toOpen && to.trim().length > 0 && (
+                  <div className="absolute z-20 mt-2 w-full overflow-hidden rounded-xl border border-zinc-800 bg-zinc-950 shadow-lg">
+                    {toMatches.length === 0 && (
+                      <div className="px-3 py-2 text-sm text-zinc-400">No matches</div>
+                    )}
+                    {toMatches.map((s) => (
+                      <button
+                        key={`to-${s.crs}`}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          setTo(s.name);
+                          setToCode(s.crs);
+                          setToOpen(false);
+                        }}
+                        className="block w-full px-3 py-2 text-left text-sm text-zinc-100 hover:bg-zinc-900"
+                      >
+                        {s.name} ({s.crs})
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="space-y-2">
               <label className="text-sm text-zinc-300">Date</label>
