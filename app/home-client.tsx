@@ -1,12 +1,10 @@
 "use client";
 
-"use client";
-
 import React, { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import StationTypeahead, { type Station } from "@/components/StationTypeahead";
-import { useJourneySearch, type Service } from "@/hooks/useJourneySearch";
-import { getOperator } from "@/lib/operators";
+import { useJourneySearch } from "@/hooks/useJourneySearch";
+import ServiceCard from "@/components/ServiceCard";
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
@@ -35,18 +33,6 @@ function shiftTimeHHMM(time: string, deltaMinutes: number) {
   const newH = Math.floor(total / 60);
   const newM = total % 60;
   return `${pad(newH)}:${pad(newM)}`;
-}
-
-function formatDelay(delayMins: number | null) {
-  if (delayMins === null) return "—";
-  if (delayMins <= 0) return "0m";
-  return `${delayMins}m`;
-}
-
-function statusClass(status: Service["status"]) {
-  if (status === "On time") return "text-zinc-200";
-  if (status === "Delayed") return "text-amber-300";
-  return "text-red-300";
 }
 
 export default function HomeClient() {
@@ -292,84 +278,9 @@ export default function HomeClient() {
 
             {services.length > 0 && (
               <div className="mt-4 space-y-3">
-                {services.map((s) => {
-                  const op = getOperator(s.operator);
-                  const eligible =
-                    !!op && s.delayMins !== null && s.delayMins >= op.minDelayMins && s.status !== "Cancelled";
-
-                  return (
-                    <div
-                      key={s.uid}
-                      className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-4"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <div className="text-base font-semibold">
-                              {s.originName} → {s.destinationName}
-                            </div>
-                            <div className="text-xs text-zinc-500">·</div>
-                            <div className="text-sm text-zinc-300">
-                              {s.operatorName}
-                              {s.platform ? ` · Platform ${s.platform}` : ""}
-                            </div>
-                          </div>
-
-                          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
-                            <div>
-                              <span className="text-zinc-400">Aimed:</span>{" "}
-                              <span className="font-medium">{s.aimedDeparture}</span>
-                            </div>
-                            <div>
-                              <span className="text-zinc-400">Expected:</span>{" "}
-                              <span className="font-medium">
-                                {s.expectedDeparture ?? "—"}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-zinc-400">Delay:</span>{" "}
-                              <span className="font-medium">{formatDelay(s.delayMins)}</span>
-                            </div>
-                            <div className={["font-semibold", statusClass(s.status)].join(" ")}>
-                              {s.status}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="shrink-0 flex flex-col items-end gap-2">
-                          {eligible ? (
-                            <a
-                              href={op!.delayRepayUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="rounded-xl bg-white px-3 py-2 text-sm font-semibold text-zinc-950 hover:bg-zinc-200"
-                            >
-                              Start claim
-                            </a>
-                          ) : (
-                            <div className="text-xs text-zinc-500 text-right">
-                              {op
-                                ? `Claim likely from ${op.minDelayMins}m+`
-                                : "Operator claim link not mapped"}
-                            </div>
-                          )}
-
-                          {/* Placeholder for drawer toggle later */}
-                          <button
-                            type="button"
-                            className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
-                            onClick={() => {
-                              // tomorrow: expand/collapse drawer
-                              // For now: no-op
-                            }}
-                          >
-                            Details
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                {services.map((s) => (
+                  <ServiceCard key={s.uid} service={s} />
+                ))}
               </div>
             )}
           </section>

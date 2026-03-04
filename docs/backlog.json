@@ -5,7 +5,7 @@
     {
       "id": "PB-001",
       "title": "Create product definition document",
-      "status": "done",
+      "status": "in-progress",
       "startedAt": "2026-03-04",
       "completedAt": "2026-03-04",
       "priority": "high",
@@ -20,7 +20,7 @@
     {
       "id": "PB-002",
       "title": "Create machine-readable backlog",
-      "status": "done",
+      "status": "in-progress",
       "startedAt": "2026-03-04",
       "completedAt": "2026-03-04",
       "priority": "high",
@@ -100,7 +100,9 @@
     {
       "id": "UI-001",
       "title": "Service cards + expandable details drawer",
-      "status": "todo",
+      "status": "in-progress",
+      "startedAt": "2026-03-04",
+      "completedAt": "2026-03-04",
       "priority": "highest",
       "dependencies": [
         "JR-001",
