@@ -9,6 +9,7 @@
 - JR-001 — Introduce Journey + Leg domain model — todo
 - JR-002 — Define stable Journey API contract (v1) — todo
 - JR-003 — Integrate TransportAPI journey planner endpoint — todo
+- JR-004 — Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg — todo
 
 ## Phase 3 — Delay Repay Engine
 - DR-001 — Multi-leg journeys + choose delayed leg (or whole journey) — todo
@@ -20,6 +21,7 @@
 - DR-007 — Service cards with expandable details drawer — done
 - DR-008 — Multi-leg journey capture and delayed-leg selection — done
 - DR-009 — Delay Repay handoff by operator with copy-pack — done
+- DR-010 — Map cancelled / no-report states into service model and display — todo
 
 ## Phase 4 — Security & Hardening
 - SEC-001 — Validate and normalise all user inputs — todo
