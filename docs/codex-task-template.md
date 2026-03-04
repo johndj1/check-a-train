@@ -65,39 +65,8 @@ Rollback plan:
 ### Task 3 – Backlog Update
 - In docs/backlog.json:
   - Set story ID "<ID>" to "in-progress" or "done".
-  - If marking done, add `"completedAt"` with ISO date format (`YYYY-MM-DD`).
-  - Only stories with status `"done"` may include `"completedAt"`.
-  - Stories with status other than `"done"` must not include `"completedAt"`.
+  - If marking done, add "completedAt": YYYY-MM-DD.
   - Do not modify other stories.
-
-### Task 4 – Codex Backlog Management Rules
-- Treat `"completedAt"` as required when moving a story to `"done"`.
-- Use the completion date for the current task run in `YYYY-MM-DD`.
-- When reopening a story (status not `"done"`), remove `"completedAt"` in the same edit.
-
-## Story Lifecycle Rules
-
-- Status transitions:
-  - `todo` -> `in-progress`: set `"startedAt"` to today's date (`YYYY-MM-DD`) if missing.
-  - `in-progress` -> `done`: set `"completedAt"` to today's date (`YYYY-MM-DD`) if missing.
-- Never overwrite existing `"startedAt"` or `"completedAt"` values.
-- Stories with status `"todo"` must not contain `"startedAt"` or `"completedAt"`.
-- Stories with status `"blocked"` must not contain `"startedAt"` or `"completedAt"`.
-- Stories with status `"in-progress"` must contain `"startedAt"`.
-- Stories with status `"done"` must contain both `"startedAt"` and `"completedAt"`.
-- All lifecycle timestamps must use ISO date format: `YYYY-MM-DD`.
-
-## Safe Git Commit Rules
-
-- Codex may stage files using `git add` when requested.
-- Codex must never automatically commit changes.
-- Codex must run validation checks before suggesting a commit:
-  - `npm run lint`
-  - `npx tsc --noEmit`
-  - `npm run build`
-- Codex must present validation results before suggesting a commit.
-- Codex may only run `git commit` after explicit user confirmation.
-- Codex must never stage `.env`, `.env.local`, or other secret files.
 
 ---
 
@@ -107,6 +76,18 @@ Rollback plan:
 - API routes return valid JSON.
 - No console errors in browser.
 - No use of `any` unless unavoidable.
+
+## 🔗 Backlog dependency check
+
+If you mark a story as "done":
+- Verify all dependencies in docs/backlog.json are also "done".
+- If any dependency is not "done", do NOT mark the story done.
+- Instead: leave it "in-progress" and report which dependencies block completion.
+
+## 🧷 Commit Story IDs
+
+When writing commit messages for backlog-linked work, include story IDs in the
+message body or subject using `(ABC-123)` format, for example `(ST-001)`.
 
 ---
 

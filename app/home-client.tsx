@@ -101,6 +101,7 @@ export default function HomeClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sp]);
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   function updateUrl(next: { window?: number; submitted?: boolean }) {
     const params = new URLSearchParams(sp.toString());
     if (next.window !== undefined) params.set("window", String(next.window));
