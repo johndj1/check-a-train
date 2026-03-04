@@ -11,6 +11,8 @@
 - JR-003 — Integrate TransportAPI journey planner endpoint — todo
 - JR-004 — Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg — done
 - JR-005 — Derive service status from planned vs expected times — todo
+- JR-006 — Switch /api/journeys to TransportAPI Journey Planner (from -> to) — in-progress
+- JR-007 — Fetch service timetable on card expand to confirm destination calling point — todo
 
 ## Phase 3 — Delay Repay Engine
 - DR-001 — Multi-leg journeys + choose delayed leg (or whole journey) — todo
