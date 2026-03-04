@@ -190,6 +190,24 @@
       "epic": "Journey Model"
     },
     {
+      "id": "JR-008",
+      "title": "Make time-window filtering resilient (avoid empty results + explain when empty)",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-002",
+        "JR-003"
+      ],
+      "acceptance": [
+        "If upstream returns services but none fall within ±windowMins, API returns the nearest N services (e.g. 3) outside the window, plus a flag explaining they are outside the requested window",
+        "API response includes a field like `windowApplied: true` and `windowMatchedCount`",
+        "UI shows a clear message when results are outside the requested window (e.g. “No trains in the requested window; showing nearest services”)",
+        "If upstream truly returns no services, UI shows the existing “No services found” message",
+        "docs/backlog.json remains valid JSON"
+      ],
+      "epic": "Journey Model"
+    },
+    {
       "id": "UI-001",
       "title": "Service cards + expandable details drawer",
       "status": "done",
@@ -270,6 +288,24 @@
         "If permission denied, user continues with manual station search",
         "Geolocation runs once per session",
         "No location data is stored server-side"
+      ],
+      "epic": "User Interface"
+    },
+    {
+      "id": "UI-006",
+      "title": "Graceful offline and upstream outage handling in search UI",
+      "status": "todo",
+      "priority": "high",
+      "dependencies": [
+        "JR-002"
+      ],
+      "acceptance": [
+        "If the browser is offline, UI shows a clear 'You appear to be offline' message before calling /api/journeys",
+        "If /api/journeys returns a network error or times out, UI shows a friendly retry state (no crash, no blank screen)",
+        "If /api/journeys returns a JSON error body, UI displays the message safely (no HTML injection) and keeps the form usable",
+        "A 'Retry' action re-runs the last search without retyping inputs",
+        "Errors are shown inline near results area and do not break StationTypeahead",
+        "No stack traces or raw HTML are shown to the user"
       ],
       "epic": "User Interface"
     },
@@ -674,6 +710,22 @@
         "Backlog remains valid JSON after update"
       ],
       "epic": "Developer Experience"
+    },
+    {
+      "id": "DEV-003",
+      "title": "Add fixture-based validation for journeys time filtering and sorting",
+      "status": "todo",
+      "priority": "medium",
+      "dependencies": [
+        "JR-005",
+        "JR-006"
+      ],
+      "acceptance": [
+        "A fixture file is added under scripts/fixtures/ (or equivalent) with representative services (aimed/expected/cancelled/unknown)",
+        "scripts/validate.mjs runs deterministic assertions for: filtering, expected-over-aimed behaviour, and sorting",
+        "Validation fails with a clear message when behaviour regresses",
+        "npm run lint, npx tsc --noEmit, and npm run build remain green"
+      ]
     },
     {
       "id": "ST-001",

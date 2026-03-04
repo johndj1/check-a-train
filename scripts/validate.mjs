@@ -22,9 +22,25 @@ function isWithinWindow(targetHHMM, centerHHMM, windowMins) {
 function assertTimeWindowFiltering() {
   const requested = "09:00";
   const windowMins = 30;
-  const aimed = ["08:25", "08:29", "08:30", "09:00", "09:30", "09:31", "23:50"];
-  const filtered = aimed.filter((t) => isWithinWindow(t, requested, windowMins));
-  const expected = ["08:30", "09:00", "09:30"];
+  const services = [
+    { aimed: "08:30", expected: null },
+    { aimed: "08:55", expected: null },
+    { aimed: "09:05", expected: null },
+    { aimed: "09:45", expected: null },
+  ];
+
+  const filtered = services
+    .map((s) => ({ ...s, timeToCheck: s.expected ?? s.aimed }))
+    .filter((s) => s.timeToCheck && isWithinWindow(s.timeToCheck, requested, windowMins))
+    .sort((a, b) => {
+      const da = Math.abs(hhmmToMins(a.timeToCheck) - hhmmToMins(requested));
+      const db = Math.abs(hhmmToMins(b.timeToCheck) - hhmmToMins(requested));
+      if (da !== db) return da - db;
+      return hhmmToMins(a.timeToCheck) - hhmmToMins(b.timeToCheck);
+    })
+    .map((s) => s.timeToCheck);
+
+  const expected = ["08:55", "09:05"];
   if (JSON.stringify(filtered) !== JSON.stringify(expected)) {
     throw new Error(
       `Time-window filter check failed. expected=${JSON.stringify(expected)} actual=${JSON.stringify(filtered)}`

@@ -27,6 +27,16 @@ function isWithinWindow(targetHHMM: string, centerHHMM: string, windowMins: numb
   return Math.abs(delta) <= windowMins;
 }
 
+function absDeltaMins(targetHHMM: string, centerHHMM: string) {
+  const target = hhmmToMins(targetHHMM);
+  const center = hhmmToMins(centerHHMM);
+  if (target == null || center == null) return Number.POSITIVE_INFINITY;
+  let delta = target - center;
+  if (delta < -720) delta += 1440;
+  if (delta > 720) delta -= 1440;
+  return Math.abs(delta);
+}
+
 function toHHMM(v: unknown): string | null {
   if (typeof v !== "string") return null;
   const text = v.trim();
@@ -118,8 +128,6 @@ function pickNumber(obj: Record<string, unknown>, keys: string[]) {
 
 export async function GET(req: Request) {
   try {
-    console.log("✅ /api/journeys hit");
-
     const APP_ID = requireEnv("TRANSPORT_API_ID");
     const APP_KEY = requireEnv("TRANSPORT_API_KEY");
 
@@ -139,6 +147,10 @@ export async function GET(req: Request) {
         { status: 400 }
       );
     }
+    const requestedTime = toHHMM(time) ?? time;
+    if (process.env.NODE_ENV === "development") {
+      console.log("journeys request", { from, to, date, time: requestedTime, window: windowMins });
+    }
 
     const url = new URL(
       `https://transportapi.com/v3/uk/train/station/${encodeURIComponent(from)}/live.json`
@@ -148,26 +160,54 @@ export async function GET(req: Request) {
     // live.json does not support the same date/time query behavior as journey planner.
     // We keep date/time in query echo for UI consistency and note this in response.
 
-    const res = await fetch(url.toString(), { cache: "no-store" });
-    const raw = await res.text();
+    let res: Response;
+    try {
+      res = await fetch(url.toString(), { cache: "no-store" });
+    } catch (err) {
+      return NextResponse.json(
+        {
+          error: "TransportAPI request failed",
+          message: err instanceof Error ? err.message : "Unknown upstream fetch error",
+        },
+        { status: 502 }
+      );
+    }
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("upstream status", res.status);
+    }
+
+    let raw = "";
+    try {
+      raw = await res.text();
+    } catch {
+      raw = "";
+    }
     const parsed =
       (res.headers.get("content-type") ?? "").includes("application/json")
         ? tryParseJson(raw)
         : null;
     const dataObj = isRecord(parsed) ? parsed : null;
-    const errorMessage =
-      dataObj && typeof dataObj.error === "string"
-        ? dataObj.error
-        : "TransportAPI station live request failed";
 
-    if (!res.ok || !dataObj) {
+    if (!res.ok) {
       return NextResponse.json(
         {
-          error: errorMessage,
-          upstreamStatus: res.status || 502,
+          error: "TransportAPI request failed",
+          upstreamStatus: res.status,
           upstream: parsed ?? raw.slice(0, 500),
         },
-        { status: res.status || 502 }
+        { status: 502 }
+      );
+    }
+
+    if (!dataObj) {
+      return NextResponse.json(
+        {
+          error: "TransportAPI returned non-JSON response",
+          upstreamStatus: res.status,
+          upstream: raw.slice(0, 500),
+        },
+        { status: 502 }
       );
     }
 
@@ -244,26 +284,36 @@ export async function GET(req: Request) {
           return destMatch || timetableMatch;
         })
       : services;
-    const timeFiltered = filtered.filter((s) =>
-      isWithinWindow(s.aimedDeparture, time, windowMins)
-    );
+    const withFilterTime = filtered
+      .map((s) => ({
+        ...s,
+        _filterTime: s.expectedDeparture ?? s.aimedDeparture,
+      }))
+      .filter((s) => {
+        if (!s._filterTime) return false;
+        return isWithinWindow(s._filterTime, requestedTime, windowMins);
+      });
+
+    const finalServices = withFilterTime.sort((a, b) => {
+      const da = absDeltaMins(a._filterTime, requestedTime);
+      const db = absDeltaMins(b._filterTime, requestedTime);
+      if (da !== db) return da - db;
+      const ta = hhmmToMins(a._filterTime) ?? Number.POSITIVE_INFINITY;
+      const tb = hhmmToMins(b._filterTime) ?? Number.POSITIVE_INFINITY;
+      return ta - tb;
+    });
 
     if (process.env.NODE_ENV === "development") {
-      const aimed = timeFiltered
-        .map((s) => s.aimedDeparture)
-        .filter((v): v is string => typeof v === "string" && v.length > 0);
-      const first = aimed[0] ?? "n/a";
-      const last = aimed[aimed.length - 1] ?? "n/a";
-      console.log(
-        `[journeys] from=${from} to=${to} requested=${time} window=+/-${windowMins} count=${timeFiltered.length} first=${first} last=${last}`
-      );
+      console.log("services before filter", filtered.length);
+      console.log("services after filter", finalServices.length);
     }
 
     return NextResponse.json({
-      query: { from, to, date, time, window: windowMins },
-      services: timeFiltered.map((service) => {
-        const { _timetableId, ...clean } = service;
+      query: { from, to, date, time: requestedTime, window: windowMins },
+      services: finalServices.map((service) => {
+        const { _timetableId, _filterTime, ...clean } = service;
         void _timetableId;
+        void _filterTime;
         return clean;
       }),
       source: "transportapi.station_live",
@@ -272,16 +322,7 @@ export async function GET(req: Request) {
     });
   } catch (e) {
     console.error("❌ /api/journeys error:", e);
-    const isDev = process.env.NODE_ENV === "development";
-    const body: { error: string; stack?: string } = {
-      error: (e as Error).message ?? "Server error",
-    };
-    if (isDev) {
-      body.stack = (e as Error).stack ?? "";
-    }
-    return NextResponse.json(
-      body,
-      { status: 500 }
-    );
+    const message = e instanceof Error ? e.message : "Unknown server error";
+    return NextResponse.json({ error: "Server error", message }, { status: 500 });
   }
 }
