@@ -9,15 +9,17 @@
 - JR-001 — Introduce Journey + Leg domain model — todo
 - JR-002 — Define stable Journey API contract (v1) — todo
 - JR-003 — Integrate TransportAPI journey planner endpoint — todo
+- JR-006 — Timetable fallback for non-now queries (avoid empty results) — todo
 - JR-004 — Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg — done
 - JR-005 — Derive service status from planned vs expected times — todo
 - JR-006 — Switch /api/journeys to TransportAPI Journey Planner (from -> to) — in-progress
 - JR-007 — Fetch service timetable on card expand to confirm destination calling point — todo
+- JR-008 — Make time-window filtering resilient (avoid empty results + explain when empty) — todo
 
 ## Phase 3 — Delay Repay Engine
 - DR-001 — Multi-leg journeys + choose delayed leg (or whole journey) — todo
 - DR-002 — Delay Repay handoff by operator + copy-pack — todo
-- DR-003 — Integrate live rail running data — todo
+- DR-003 — Integrate live rail running data — in-progress
 - DR-004 — Calculate Delay Repay eligibility — todo
 - DR-005 — Journey cards with expandable details — done
 - DR-006 — Operator Delay Repay handoff — done
@@ -42,11 +44,9 @@
 ## Phase 5 — Infrastructure & Developer Experience
 - DEV-001 — Codex commit helper (safe mode: no auto-commit until tests pass) — todo
 - DEV-002 — Auto-close backlog stories from commit messages — todo
+- DEV-003 — Add fixture-based validation for journeys time filtering and sorting — todo
 - INF-001 — Introduce CI/CD pipeline for build and deployment — todo
 
 ## Future Experiments
 - EXP-001 — User accounts for saved journeys — todo
 - EXP-002 — Delay alerts for saved journeys — todo
-
-## Operational Notes
-- Station typeahead now uses a local station index (`data/stations.uk.json`) to preserve TransportAPI free-plan quota.
