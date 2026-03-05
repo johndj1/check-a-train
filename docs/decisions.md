@@ -94,3 +94,28 @@ Notes:
 Purpose:
 This workflow ensures the roadmap and changelog are always consistent with
 the backlog and commit history, while keeping commits explicit and safe.
+
+## ADR-006: Local Station Dataset + Monthly Refresh
+
+### Context
+Station typeahead is a high-frequency interaction. Calling paid/free-tier upstream APIs
+for every station query risks exhausting daily limits and can degrade UX when the network is slow.
+
+### Decision
+- `/api/stations` uses a checked-in local station dataset (`data/stations.uk.json`) as its source.
+- Station search is fully local and does not call TransportAPI.
+- Dataset refresh is manual monthly for now via `node scripts/refresh-stations.mjs` using local source input (`data/stations.json`).
+
+### Rationale
+- Keeps station lookup fast and reliable.
+- Avoids burning TransportAPI free-plan calls for typeahead.
+- Keeps data reasonably current with low operational overhead.
+
+### Consequences
+Pros:
+- Predictable station-search performance and zero runtime dependency on upstream station lookup.
+- Auditable dataset updates via PR history.
+
+Cons:
+- Dataset can be stale between refreshes.
+- Requires manual monthly refresh discipline until a stable automated source is adopted.

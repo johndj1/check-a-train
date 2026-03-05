@@ -1,0 +1,61 @@
+name: Refresh Stations Dataset
+
+on:
+  schedule:
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  refresh-stations:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Refresh stations dataset
+        id: refresh
+        continue-on-error: true
+        env:
+          ALLOW_TRANSPORTAPI_STATION_REFRESH: "0"
+        run: node scripts/refresh-stations.mjs
+
+      - name: Stop cleanly if refresh failed
+        if: steps.refresh.outcome != 'success'
+        run: |
+          echo "Station refresh failed; skipping validation and PR creation."
+          exit 0
+
+      - name: Validate
+        if: steps.refresh.outcome == 'success'
+        run: |
+          npm run lint
+          npx tsc --noEmit
+
+      - name: Create pull request
+        if: steps.refresh.outcome == 'success'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore: refresh station dataset"
+          title: "chore: refresh station dataset"
+          body: |
+            Automated monthly refresh of `data/stations-uk.json`.
+
+            - Regenerated with `node scripts/refresh-stations.mjs`
+            - Validation passed (`npm run lint`, `npx tsc --noEmit`)
+          branch: chore/refresh-stations-dataset
+          labels: |
+            automation
+            data-refresh

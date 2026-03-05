@@ -114,6 +114,27 @@
       "epic": "Journey Model"
     },
     {
+      "id": "JR-006",
+      "title": "Timetable fallback for non-now queries (avoid empty results)",
+      "status": "todo",
+      "priority": "highest",
+      "dependencies": [
+        "JR-001",
+        "JR-002"
+      ],
+      "acceptance": [
+        "When date is not today, /api/journeys uses a timetable-capable feed (not station live) and returns services around the requested time",
+        "When date is today and requested time is within ±180 minutes of now, /api/journeys uses station live feed",
+        "When date is today but requested time is outside ±180 minutes of now, /api/journeys uses timetable feed",
+        "API response shape remains unchanged (query, services, source, note) and service field names remain consistent",
+        "Time-window filtering is applied consistently for both sources using expectedDeparture ?? aimedDeparture as the canonical filter time",
+        "Response source is transportapi.station_live or transportapi.station_timetable depending on chosen feed",
+        "Dev-only logs include chosenSource, requested date/time/window, and beforeCount/afterCount",
+        "scripts/validate.mjs includes deterministic checks for source selection (non-today → timetable; today-but-far-from-now → timetable)"
+      ],
+      "epic": "Journey Model"
+    },
+    {
       "id": "JR-004",
       "title": "Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg",
       "status": "done",
@@ -345,7 +366,8 @@
     {
       "id": "DR-003",
       "title": "Integrate live rail running data",
-      "status": "todo",
+      "status": "in-progress",
+      "startedAt": "2026-03-05",
       "priority": "highest",
       "dependencies": [
         "JR-002",

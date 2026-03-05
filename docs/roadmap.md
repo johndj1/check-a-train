@@ -47,3 +47,6 @@
 ## Future Experiments
 - EXP-001 — User accounts for saved journeys — todo
 - EXP-002 — Delay alerts for saved journeys — todo
+
+## Operational Notes
+- Station typeahead now uses a local station index (`data/stations.uk.json`) to preserve TransportAPI free-plan quota.

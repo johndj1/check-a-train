@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<serviceDetails generatedAt="2026-03-05T08:16:00Z">
+  <service rid="20260305SEV001">
+    <sta>09:03</sta>
+    <eta>09:03</eta>
+    <isCancelled>false</isCancelled>
+  </service>
+
+  <service rid="20260305SEV002">
+    <sta>09:13</sta>
+    <eta>09:21</eta>
+    <isCancelled>false</isCancelled>
+  </service>
+
+  <service rid="20260305SEV003">
+    <sta>09:23</sta>
+    <eta>CANC</eta>
+    <isCancelled>true</isCancelled>
+    <cancelReasonCode>CANC/NR</cancelReasonCode>
+  </service>
+
+  <service rid="20260305SEV004">
+    <sta>09:34</sta>
+    <isCancelled>false</isCancelled>
+  </service>
+</serviceDetails>

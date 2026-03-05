@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<departures boardCrs="SEV" generatedAt="2026-03-05T08:15:00Z">
+  <service rid="20260305SEV001" uid="1A01">
+    <operatorCode>SE</operatorCode>
+    <operatorName>Southeastern</operatorName>
+    <originName>Sevenoaks</originName>
+    <destinationName>London Bridge</destinationName>
+    <std>08:30</std>
+    <etd>On time</etd>
+    <platform>1</platform>
+  </service>
+
+  <service rid="20260305SEV002" uid="1A02">
+    <operatorCode>SE</operatorCode>
+    <operatorName>Southeastern</operatorName>
+    <originName>Sevenoaks</originName>
+    <destinationName>London Bridge</destinationName>
+    <std>08:40</std>
+    <etd>08:48</etd>
+    <platform>2</platform>
+  </service>
+
+  <service rid="20260305SEV003" uid="1A03">
+    <operatorCode>SE</operatorCode>
+    <operatorName>Southeastern</operatorName>
+    <originName>Sevenoaks</originName>
+    <destinationName>London Bridge</destinationName>
+    <std>08:50</std>
+    <etd>CANC/NR</etd>
+    <platform>3</platform>
+  </service>
+
+  <service rid="20260305SEV004" uid="1A04">
+    <operatorCode>SE</operatorCode>
+    <operatorName>Southeastern</operatorName>
+    <originName>Sevenoaks</originName>
+    <destinationName>London Bridge</destinationName>
+    <std>09:04</std>
+    <platform>4</platform>
+  </service>
+</departures>

@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { getStations, type Station } from "@/lib/stations";
-import { useJourneySearch } from "@/hooks/useJourneySearch";
 import ServiceCard from "@/components/ServiceCard";
+import type { Service } from "@/hooks/useJourneySearch";
 
 function pad(n: number) {
   return n.toString().padStart(2, "0");
@@ -19,13 +19,25 @@ function nowHHMM() {
   return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function shiftTimeHHMM(time: string, deltaMinutes: number) {
-  const m = /^(\d{2}):(\d{2})$/.exec(time);
+function normalizeHHMM(time: string) {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(time.trim());
   if (!m) return time;
 
   const hh = Number(m[1]);
   const mm = Number(m[2]);
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return time;
+  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return time;
+  return `${pad(hh)}:${pad(mm)}`;
+}
+
+function shiftTimeHHMM(time: string, deltaMinutes: number) {
+  const normalized = normalizeHHMM(time);
+  const m = /^(\d{2}):(\d{2})$/.exec(normalized);
+  if (!m) return normalized;
+
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return normalized;
 
   let total = hh * 60 + mm + deltaMinutes;
   total = ((total % 1440) + 1440) % 1440;
@@ -35,8 +47,31 @@ function shiftTimeHHMM(time: string, deltaMinutes: number) {
   return `${pad(newH)}:${pad(newM)}`;
 }
 
+function filterTimeForService(service: Service) {
+  const raw = (service.expectedDeparture ?? service.aimedDeparture ?? "").trim();
+  return raw.length > 0 ? raw : null;
+}
+
+function hhmmToMinsStrict(hhmm: string) {
+  const m = /^(\d{2}):(\d{2})$/.exec(hhmm);
+  if (!m) return null;
+  const hh = Number(m[1]);
+  const mm = Number(m[2]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm) || hh < 0 || hh > 23 || mm < 0 || mm > 59) {
+    return null;
+  }
+  return hh * 60 + mm;
+}
+
+function minsToHHMM(mins: number) {
+  if (!Number.isFinite(mins)) return null;
+  const bounded = ((Math.trunc(mins) % 1440) + 1440) % 1440;
+  const hh = Math.floor(bounded / 60);
+  const mm = bounded % 60;
+  return `${pad(hh)}:${pad(mm)}`;
+}
+
 export default function HomeClient() {
-  const router = useRouter();
   const sp = useSearchParams();
 
   // URL state (defaults)
@@ -60,22 +95,89 @@ export default function HomeClient() {
   const [toOpen, setToOpen] = useState(false);
 
   const windowMins = Number.isFinite(windowUrl) ? Math.min(Math.max(windowUrl, 15), 180) : 30;
+  const isDev = process.env.NODE_ENV === "development";
+  const debugFromQuery = sp.get("debug") === "1";
+  const debugAvailable = isDev || debugFromQuery;
 
   // Source-of-truth validation: must pick from dropdown
   const formValid = !!fromCode && !!toCode;
+  const [debugMode, setDebugMode] = useState(debugFromQuery);
 
-  const fromParam = fromCode || fromUrl;
-  const toParam = toCode || toUrl;
-
-  const { services, loading, error, setError } = useJourneySearch({
-    submitted,
-    formValid,
-    from: fromParam,
-    to: toParam,
+  const [services, setServices] = useState<Service[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [submittedState, setSubmittedState] = useState(submitted);
+  const [queryView, setQueryView] = useState({
+    fromName: fromUrl,
+    toName: toUrl,
+    fromCode: sp.get("fromCode") ?? "",
+    toCode: sp.get("toCode") ?? "",
     date: dateUrl,
     time: timeUrl,
     windowMins,
   });
+
+  async function runJourneyFetch(args: {
+    fromCode: string;
+    toCode: string;
+    date: string;
+    time: string;
+    windowMins: number;
+  }) {
+    const url =
+      `/api/journeys?from=${encodeURIComponent(args.fromCode)}` +
+      `&to=${encodeURIComponent(args.toCode)}` +
+      `&date=${encodeURIComponent(args.date)}` +
+      `&time=${encodeURIComponent(args.time)}` +
+      `&window=${encodeURIComponent(String(args.windowMins))}`;
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("journey fetch before fetch()", { url, ...args });
+    }
+
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(url);
+      if (process.env.NODE_ENV === "development") {
+        console.log("journey fetch resolved", { url, status: res.status, ok: res.ok });
+      }
+      const raw = await res.text();
+      const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
+      const data = isJson ? (JSON.parse(raw) as { services?: Service[]; error?: string }) : null;
+      if (!res.ok) {
+        const msg =
+          data?.error ??
+          (raw.trim().startsWith("<")
+            ? "Server returned HTML (check /api/journeys error)."
+            : raw.slice(0, 200)) ??
+          "Failed to fetch journeys.";
+        setServices([]);
+        setError(msg);
+        return;
+      }
+      if (!data || !Array.isArray(data.services)) {
+        setServices([]);
+        setError("API returned non-JSON response. Check /api/journeys in the browser.");
+        return;
+      }
+      setServices(data.services);
+    } catch (e) {
+      const err = e as Error;
+      if (process.env.NODE_ENV === "development") {
+        console.log("journey fetch error", {
+          url,
+          name: err.name,
+          message: err.message,
+          stack: err.stack ?? null,
+        });
+      }
+      setServices([]);
+      setError("Network error while fetching journeys.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -106,31 +208,43 @@ export default function HomeClient() {
 
   // Keep codes synced from URL (so refresh/share works)
   useEffect(() => {
-    const fc = sp.get("fromCode") ?? "";
-    if (fc !== fromCode) setFromCode(fc);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp]);
+    if (debugFromQuery) setDebugMode(true);
+  }, [debugFromQuery]);
 
-  useEffect(() => {
-    const tc = sp.get("toCode") ?? "";
-    if (tc !== toCode) setToCode(tc);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sp]);
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  function updateUrl(next: { window?: number; submitted?: boolean }) {
-    const params = new URLSearchParams(sp.toString());
-    if (next.window !== undefined) params.set("window", String(next.window));
-    if (next.submitted !== undefined) params.set("submitted", next.submitted ? "1" : "0");
-    router.replace(`/?${params.toString()}`);
-  }
+  const filterTimeRows = services
+    .flatMap((service) => {
+      const filterTime = filterTimeForService(service);
+      return filterTime ? [{ uid: service.uid, filterTime }] : [];
+    });
+  const firstFiveFilterTimes = filterTimeRows.slice(0, 5);
+  const parsedFilterMins = filterTimeRows.flatMap((row) => {
+    const mins = hhmmToMinsStrict(row.filterTime);
+    return mins === null ? [] : [mins];
+  });
+  const minFilterTime =
+    parsedFilterMins.length > 0 ? minsToHHMM(Math.min(...parsedFilterMins)) : null;
+  const maxFilterTime =
+    parsedFilterMins.length > 0 ? minsToHHMM(Math.max(...parsedFilterMins)) : null;
 
   function updateTimeInUrl(deltaMinutes: number) {
-    const params = new URLSearchParams(sp.toString());
-    const currentTime = params.get("time") ?? timeUrl;
-    params.set("time", shiftTimeHHMM(currentTime, deltaMinutes));
-    params.set("submitted", "1");
-    router.replace(`/?${params.toString()}`);
+    const currentTime = queryView.time || time;
+    const nextTime = shiftTimeHHMM(currentTime, deltaMinutes);
+    setTime(nextTime);
+    if (!submittedState) return;
+    setQueryView((prev) => ({ ...prev, time: nextTime }));
+    const params = new URLSearchParams(window.location.search);
+    params.set("time", nextTime);
+    window.history.replaceState({}, "", `/?${params.toString()}`);
+    if (process.env.NODE_ENV === "development") {
+      console.log("time shift click", { currentTime, deltaMinutes, nextTime });
+    }
+    void runJourneyFetch({
+      fromCode: queryView.fromCode,
+      toCode: queryView.toCode,
+      date: queryView.date,
+      time: nextTime,
+      windowMins: queryView.windowMins,
+    });
   }
 
   function onSubmit(e: React.FormEvent) {
@@ -155,13 +269,34 @@ export default function HomeClient() {
       return;
     }
 
-    router.replace(
-      `/?from=${encodeURIComponent(f)}&fromCode=${encodeURIComponent(fromCode)}&to=${encodeURIComponent(
-        t
-      )}&toCode=${encodeURIComponent(toCode)}&date=${encodeURIComponent(date)}&time=${encodeURIComponent(
-        time
-      )}&window=30&submitted=1`
-    );
+    const nextQuery = {
+      fromName: f,
+      toName: t,
+      fromCode,
+      toCode,
+      date,
+      time,
+      windowMins: 30,
+    };
+    setSubmittedState(true);
+    setQueryView(nextQuery);
+    const params = new URLSearchParams(window.location.search);
+    params.set("from", f);
+    params.set("fromCode", fromCode);
+    params.set("to", t);
+    params.set("toCode", toCode);
+    params.set("date", date);
+    params.set("time", time);
+    params.set("window", "30");
+    params.set("submitted", "1");
+    window.history.replaceState({}, "", `/?${params.toString()}`);
+    void runJourneyFetch({
+      fromCode,
+      toCode,
+      date,
+      time,
+      windowMins: 30,
+    });
   }
 
   function onReset() {
@@ -172,7 +307,9 @@ export default function HomeClient() {
     setToCode("");
     setDate(todayISO());
     setTime(nowHHMM());
-    router.replace(`/`);
+    setServices([]);
+    setSubmittedState(false);
+    window.history.replaceState({}, "", `/`);
   }
 
   return (
@@ -324,15 +461,15 @@ export default function HomeClient() {
           </form>
         </div>
 
-        {submitted && (
+        {submittedState && (
           <section className="mt-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold">
-                  {fromUrl || from.trim()} → {toUrl || to.trim()}
+                  {queryView.fromName || from.trim()} → {queryView.toName || to.trim()}
                 </h2>
                 <p className="text-sm text-zinc-400">
-                  {dateUrl} · window ±{windowMins} minutes around {timeUrl}
+                  {queryView.date} · window ±{queryView.windowMins} minutes around {queryView.time}
                 </p>
               </div>
 
@@ -349,8 +486,35 @@ export default function HomeClient() {
                 >
                   Later (+60 mins)
                 </button>
+                {debugAvailable && (
+                  <button
+                    type="button"
+                    onClick={() => setDebugMode((v) => !v)}
+                    className={[
+                      "rounded-xl border px-3 py-2 text-sm",
+                      debugMode
+                        ? "border-emerald-700 bg-emerald-900/20 text-emerald-200 hover:bg-emerald-900/30"
+                        : "border-zinc-700 text-zinc-200 hover:bg-zinc-800",
+                    ].join(" ")}
+                  >
+                    Debug {debugMode ? "on" : "off"}
+                  </button>
+                )}
               </div>
             </div>
+
+            {debugAvailable && debugMode && (
+              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950 px-3 py-3 font-mono text-xs text-zinc-300">
+                <div>Query from/to CRS: {queryView.fromCode || "?"} → {queryView.toCode || "?"}</div>
+                <div>Query date/time/window: {queryView.date} {queryView.time} ±{queryView.windowMins}</div>
+                <div>State submitted/formValid: {submittedState ? "true" : "false"} / {formValid ? "true" : "false"}</div>
+                <div>Fetch loading/error/count: {loading ? "true" : "false"} / {error ?? "none"} / {services.length}</div>
+                <div>Time sanity min/max: {minFilterTime ?? "n/a"} / {maxFilterTime ?? "n/a"}</div>
+                <div>Time sanity first5 (uid@time): {firstFiveFilterTimes.length === 0
+                  ? "none"
+                  : firstFiveFilterTimes.map((row) => `${row.uid}@${row.filterTime}`).join(" | ")}</div>
+              </div>
+            )}
 
             {loading && (
               <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm text-zinc-300">

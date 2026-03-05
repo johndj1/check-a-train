@@ -9,7 +9,7 @@ export type Service = {
   originName: string;
   destinationName: string;
 
-  aimedDeparture: string; // HH:MM
+  aimedDeparture: string | null; // HH:MM or null
   expectedDeparture: string | null; // HH:MM or null
   delayMins: number | null;
 
@@ -53,6 +53,28 @@ export function useJourneySearch(q: JourneyQuery) {
 
     async function run() {
       if (!q.submitted || !q.formValid) {
+        if (process.env.NODE_ENV === "development") {
+          console.log("journey fetch skipped", {
+            reason: !q.submitted ? "not-submitted" : "form-invalid",
+            submitted: q.submitted,
+            formValid: q.formValid,
+          });
+        }
+        setServices([]);
+        setLoading(false);
+        return;
+      }
+      if (!q.from || !q.to || !q.date || !q.time) {
+        if (process.env.NODE_ENV === "development") {
+          console.log("journey fetch skipped", {
+            reason: "missing-query-fields",
+            from: q.from,
+            to: q.to,
+            date: q.date,
+            time: q.time,
+          });
+        }
+        setError("Missing journey query fields.");
         setServices([]);
         setLoading(false);
         return;
@@ -68,8 +90,28 @@ export function useJourneySearch(q: JourneyQuery) {
         `&time=${encodeURIComponent(q.time)}` +
         `&window=${encodeURIComponent(String(q.windowMins))}`;
 
+      if (process.env.NODE_ENV === "development") {
+        console.log("journey fetch before fetch()", {
+          url,
+          submitted: q.submitted,
+          formValid: q.formValid,
+          from: q.from,
+          to: q.to,
+          date: q.date,
+          time: q.time,
+          windowMins: q.windowMins,
+        });
+      }
+
       try {
         const res = await fetch(url, { signal: controller.signal });
+        if (process.env.NODE_ENV === "development") {
+          console.log("journey fetch resolved", {
+            url,
+            status: res.status,
+            ok: res.ok,
+          });
+        }
 
         // ✅ Always read as text first (prevents JSON parse exploding on HTML)
         const raw = await res.text();
@@ -96,7 +138,16 @@ export function useJourneySearch(q: JourneyQuery) {
 
         setServices(Array.isArray(data.services) ? data.services : []);
       } catch (e) {
-        if ((e as Error).name !== "AbortError") {
+        const err = e as Error;
+        if (process.env.NODE_ENV === "development") {
+          console.log("journey fetch error", {
+            url,
+            name: err.name,
+            message: err.message,
+            stack: err.stack ?? null,
+          });
+        }
+        if (err.name !== "AbortError") {
           setError("Network error while fetching journeys.");
           setServices([]);
         }
