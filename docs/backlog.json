@@ -366,7 +366,7 @@
     {
       "id": "DR-003",
       "title": "Integrate live rail running data",
-      "status": "in-progress",
+      "status": "done",
       "startedAt": "2026-03-05",
       "priority": "highest",
       "dependencies": [
@@ -379,7 +379,8 @@
         "Delayed and cancelled services are represented in API response fields",
         "Upstream errors are returned as controlled JSON without server stack details"
       ],
-      "epic": "Delay Repay"
+      "epic": "Delay Repay",
+      "completedAt": "2026-03-05"
     },
     {
       "id": "DR-011",
