@@ -35,6 +35,43 @@ function chooseSource({ date, now = new Date() }) {
   return date === todayISO ? "live" : "timetable";
 }
 
+function parseISODate(dateStr) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateStr);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]);
+  const day = Number(m[3]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null;
+  const d = new Date(year, month - 1, day);
+  if (d.getFullYear() !== year || d.getMonth() !== month - 1 || d.getDate() !== day) return null;
+  return d;
+}
+
+function hspDayType(dateStr) {
+  const d = parseISODate(dateStr);
+  if (!d) return "WEEKDAY";
+  const day = d.getDay();
+  if (day === 6) return "SATURDAY";
+  if (day === 0) return "SUNDAY";
+  return "WEEKDAY";
+}
+
+function minsToCompactHHMM(totalMins) {
+  const clamped = Math.min(Math.max(Math.floor(totalMins), 0), 1439);
+  const hh = String(Math.floor(clamped / 60)).padStart(2, "0");
+  const mm = String(clamped % 60).padStart(2, "0");
+  return `${hh}${mm}`;
+}
+
+function hhmmWindowToCompactBounds(hhmm, windowMins) {
+  const mins = hhmmToMins(hhmm);
+  if (mins == null) return null;
+  return {
+    from: minsToCompactHHMM(mins - windowMins),
+    to: minsToCompactHHMM(mins + windowMins),
+  };
+}
+
 function buildJourneysEndpoint({ from, to, date, time, now = new Date() }) {
   const selectedSource = chooseSource({ date, now });
   const base =
@@ -398,6 +435,32 @@ function assertDarwinFixtureRegression() {
   }
 }
 
+function assertHspHelpersRegression() {
+  const bounds = hhmmWindowToCompactBounds("19:46", 30);
+  if (!bounds || bounds.from !== "1916" || bounds.to !== "2016") {
+    throw new Error(
+      `HSP helper regression: expected 19:46 +/- 30 to map to 1916..2016. actual=${JSON.stringify(bounds)}`
+    );
+  }
+
+  const earlyBounds = hhmmWindowToCompactBounds("00:10", 30);
+  if (!earlyBounds || earlyBounds.from !== "0000" || earlyBounds.to !== "0040") {
+    throw new Error(
+      `HSP helper regression: expected 00:10 +/- 30 to clamp to 0000..0040. actual=${JSON.stringify(earlyBounds)}`
+    );
+  }
+
+  if (hspDayType("2026-03-06") !== "WEEKDAY") {
+    throw new Error("HSP helper regression: 2026-03-06 should be WEEKDAY.");
+  }
+  if (hspDayType("2026-03-07") !== "SATURDAY") {
+    throw new Error("HSP helper regression: 2026-03-07 should be SATURDAY.");
+  }
+  if (hspDayType("2026-03-08") !== "SUNDAY") {
+    throw new Error("HSP helper regression: 2026-03-08 should be SUNDAY.");
+  }
+}
+
 const checks = [
   ["npm", ["run", "lint"]],
   ["npx", ["tsc", "--noEmit"]],
@@ -421,6 +484,7 @@ assertJourneysUrlBuilderRegression();
 assertStationsLocalSearchRegression();
 assertDelayCalculationRegression();
 assertDarwinFixtureRegression();
+assertHspHelpersRegression();
 
 for (const [cmd, args] of checks) {
   const code = await run(cmd, args);

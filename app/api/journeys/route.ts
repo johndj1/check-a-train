@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { fetchDarwinServices, type DarwinNormalizedService } from "@/lib/darwin/client";
+import { fetchHspServices, HspCredentialsError } from "@/lib/hsp";
 
 function requireEnv(name: string) {
   const v = process.env[name];
@@ -217,6 +218,8 @@ export async function GET(req: Request) {
     const todayYYYYMMDD = getTodayISO();
     const selectedSource = chooseSource({ date });
     const darwinMode = (process.env.DARWIN_MODE ?? "off").trim().toLowerCase();
+    const useHsp = process.env.USE_HSP === "1";
+    const shouldTryHsp = useHsp && darwinMode !== "fixture" && date !== todayYYYYMMDD;
     let source =
       selectedSource === "live" ? "transportapi.station_live" : "transportapi.station_timetable";
     let sourceReason =
@@ -229,6 +232,61 @@ export async function GET(req: Request) {
     }
 
     let services: DarwinNormalizedService[] | null = null;
+    const tryLoadHsp = async (reason: string) => {
+      try {
+        const hspResult = await fetchHspServices({
+          from,
+          to,
+          date,
+          time: requestedTime,
+          windowMins,
+          detailsLimit: 5,
+        });
+        source = "darwin.hsp";
+        sourceReason = [
+          `Using HSP provider (${reason}).`,
+          `HSP query used ${hspResult.query.from_time}-${hspResult.query.to_time} ${hspResult.query.days}.`,
+          "Window conversion currently clamps at day boundaries (no cross-midnight expansion).",
+        ].join(" ");
+        if (process.env.NODE_ENV === "development") {
+          console.log("journeys upstream", {
+            source,
+            reason,
+            returnedServices: hspResult.services.length,
+          });
+        }
+        return { services: hspResult.services as DarwinNormalizedService[] };
+      } catch (hspErr) {
+        if (hspErr instanceof HspCredentialsError) {
+          return {
+            errorResponse: NextResponse.json(
+              {
+                error: "HSP credentials missing",
+                message:
+                  "USE_HSP=1 is enabled but HSP_USERNAME/HSP_PASSWORD are not set. Add credentials or disable USE_HSP.",
+              },
+              { status: 502 }
+            ),
+          };
+        }
+        if (process.env.NODE_ENV === "development") {
+          console.log("hsp fetch failed", {
+            reason,
+            message: hspErr instanceof Error ? hspErr.message : "Unknown HSP error",
+          });
+        }
+        return { services: null };
+      }
+    };
+
+    if (shouldTryHsp) {
+      const hspFirstAttempt = await tryLoadHsp("non-today date with USE_HSP=1");
+      if ("errorResponse" in hspFirstAttempt) return hspFirstAttempt.errorResponse;
+      if (hspFirstAttempt.services && hspFirstAttempt.services.length > 0) {
+        services = hspFirstAttempt.services;
+      }
+    }
+
     if (darwinMode === "fixture") {
       try {
         const darwinResult = await fetchDarwinServices({
@@ -305,94 +363,113 @@ export async function GET(req: Request) {
       const dataObj = isRecord(parsed) ? parsed : null;
 
       if (!res.ok) {
-        return NextResponse.json(
-          {
-            error: "TransportAPI request failed",
-            upstreamStatus: res.status,
-            upstream: parsed ?? raw.slice(0, 500),
-          },
-          { status: 502 }
-        );
+        if (shouldTryHsp) {
+          const hspFallbackAttempt = await tryLoadHsp(`TransportAPI upstream status ${res.status}`);
+          if ("errorResponse" in hspFallbackAttempt) return hspFallbackAttempt.errorResponse;
+          if (hspFallbackAttempt.services && hspFallbackAttempt.services.length > 0) {
+            services = hspFallbackAttempt.services;
+          }
+        }
+        if (!services) {
+          return NextResponse.json(
+            {
+              error: "TransportAPI request failed",
+              upstreamStatus: res.status,
+              upstream: parsed ?? raw.slice(0, 500),
+            },
+            { status: 502 }
+          );
+        }
       }
 
-      if (!dataObj) {
-        return NextResponse.json(
-          {
-            error: "TransportAPI returned non-JSON response",
-            upstreamStatus: res.status,
-            upstream: raw.slice(0, 500),
-          },
-          { status: 502 }
-        );
-      }
+      if (!services) {
+        if (!dataObj) {
+          return NextResponse.json(
+            {
+              error: "TransportAPI returned non-JSON response",
+              upstreamStatus: res.status,
+              upstream: raw.slice(0, 500),
+            },
+            { status: 502 }
+          );
+        }
 
-      const rows = extractDepartureRows(dataObj);
-      const stationName =
-        typeof dataObj.station_name === "string" ? dataObj.station_name : from;
+        const rows = extractDepartureRows(dataObj);
+        const stationName =
+          typeof dataObj.station_name === "string" ? dataObj.station_name : from;
 
-      services = rows.map((r, idx) => {
-        const row: Record<string, unknown> = isRecord(r) ? r : {};
-        const aimedDep = toHHMM(pickString(row, ["aimed_departure_time", "departure_time"]));
-        const expectedDepDirect = toHHMM(
-          pickString(row, [
-            "expected_departure_time",
-            "live_departure_time",
-            "realtime_departure_time",
-            "expected_departure",
-            "expected_departure_datetime",
-          ])
-        );
-        const depEstimateMins = pickNumber(row, ["best_departure_estimate_mins"]);
-        const expectedDep =
-          expectedDepDirect ??
-          (aimedDep && depEstimateMins !== null ? addMinsToHHMM(aimedDep, depEstimateMins) : null);
+        services = rows.map((r, idx) => {
+          const row: Record<string, unknown> = isRecord(r) ? r : {};
+          const aimedDep = toHHMM(pickString(row, ["aimed_departure_time", "departure_time"]));
+          const expectedDepDirect = toHHMM(
+            pickString(row, [
+              "expected_departure_time",
+              "live_departure_time",
+              "realtime_departure_time",
+              "expected_departure",
+              "expected_departure_datetime",
+            ])
+          );
+          const depEstimateMins = pickNumber(row, ["best_departure_estimate_mins"]);
+          const expectedDep =
+            expectedDepDirect ??
+            (aimedDep && depEstimateMins !== null ? addMinsToHHMM(aimedDep, depEstimateMins) : null);
 
-        const aimedArr = toHHMM(pickString(row, ["aimed_arrival_time", "arrival_time"]));
-        const expectedArr = toHHMM(
-          pickString(row, [
-            "expected_arrival_time",
-            "live_arrival_time",
-            "realtime_arrival_time",
-            "expected_arrival",
-            "expected_arrival_datetime",
-          ])
-        );
-        const delayMins =
-          aimedArr && expectedArr
-            ? diffMins(aimedArr, expectedArr)
-            : aimedDep && expectedDep
-              ? diffMins(aimedDep, expectedDep)
-              : depEstimateMins;
-        const statusCandidate = pickString(row, ["status", "train_status"]);
-        const status = deriveStatus(statusCandidate, delayMins);
-        const serviceTimetable = isRecord(row.service_timetable) ? row.service_timetable : null;
-        const timetableId =
-          serviceTimetable && typeof serviceTimetable.id === "string" ? serviceTimetable.id : null;
+          const aimedArr = toHHMM(pickString(row, ["aimed_arrival_time", "arrival_time"]));
+          const expectedArr = toHHMM(
+            pickString(row, [
+              "expected_arrival_time",
+              "live_arrival_time",
+              "realtime_arrival_time",
+              "expected_arrival",
+              "expected_arrival_datetime",
+            ])
+          );
+          const delayMins =
+            aimedArr && expectedArr
+              ? diffMins(aimedArr, expectedArr)
+              : aimedDep && expectedDep
+                ? diffMins(aimedDep, expectedDep)
+                : depEstimateMins;
+          const statusCandidate = pickString(row, ["status", "train_status"]);
+          const status = deriveStatus(statusCandidate, delayMins);
+          const serviceTimetable = isRecord(row.service_timetable) ? row.service_timetable : null;
+          const timetableId =
+            serviceTimetable && typeof serviceTimetable.id === "string" ? serviceTimetable.id : null;
 
-        return {
-          uid: String(
-            pickString(row, ["train_uid", "service", "uid"]) ?? `${from}-${date}-${time}-${idx}`
-          ),
-          operator: pickString(row, ["operator", "operator_code", "toc"]),
-          operatorName: String(pickString(row, ["operator_name", "operator"]) ?? "Unknown"),
-          platform: pickString(row, ["platform"]),
-          originName: String(pickString(row, ["origin_name"]) ?? stationName),
-          destinationName: String(pickString(row, ["destination_name"]) ?? to),
-          aimedDeparture: aimedDep,
-          expectedDeparture: expectedDep,
-          delayMins,
-          status,
-          callsAtTo: undefined,
-          _timetableId: timetableId,
-        };
-      });
-
-      if (process.env.NODE_ENV === "development") {
-        console.log("journeys upstream", {
-          source,
-          returnedServices: services.length,
-          delaySummary: summarizeDelay(services),
+          return {
+            uid: String(
+              pickString(row, ["train_uid", "service", "uid"]) ?? `${from}-${date}-${time}-${idx}`
+            ),
+            operator: pickString(row, ["operator", "operator_code", "toc"]),
+            operatorName: String(pickString(row, ["operator_name", "operator"]) ?? "Unknown"),
+            platform: pickString(row, ["platform"]),
+            originName: String(pickString(row, ["origin_name"]) ?? stationName),
+            destinationName: String(pickString(row, ["destination_name"]) ?? to),
+            aimedDeparture: aimedDep,
+            expectedDeparture: expectedDep,
+            delayMins,
+            status,
+            callsAtTo: undefined,
+            _timetableId: timetableId,
+          };
         });
+
+        if (shouldTryHsp && services.length === 0) {
+          const hspFallbackAttempt = await tryLoadHsp("TransportAPI returned empty services");
+          if ("errorResponse" in hspFallbackAttempt) return hspFallbackAttempt.errorResponse;
+          if (hspFallbackAttempt.services && hspFallbackAttempt.services.length > 0) {
+            services = hspFallbackAttempt.services;
+          }
+        }
+
+        if (process.env.NODE_ENV === "development") {
+          console.log("journeys upstream", {
+            source,
+            returnedServices: services.length,
+            delaySummary: summarizeDelay(services),
+          });
+        }
       }
     }
 
