@@ -1,0 +1,48 @@
+{
+  "services": [
+    {
+      "rid": "202603020850",
+      "operator": "Southeastern",
+      "aimedDeparture": "08:50",
+      "expectedDeparture": "08:52",
+      "aimedArrival": "09:20",
+      "expectedArrival": "09:25",
+      "platform": "2",
+      "status": "Delayed",
+      "delayMins": 5
+    },
+    {
+      "rid": "202603020905",
+      "operator": "Southeastern",
+      "aimedDeparture": "09:05",
+      "expectedDeparture": "09:05",
+      "aimedArrival": "09:35",
+      "expectedArrival": "09:35",
+      "platform": "1",
+      "status": "On time",
+      "delayMins": 0
+    },
+    {
+      "rid": "202603020915",
+      "operator": "Southeastern",
+      "aimedDeparture": "09:15",
+      "expectedDeparture": null,
+      "aimedArrival": "09:45",
+      "expectedArrival": null,
+      "platform": null,
+      "status": "Unknown",
+      "delayMins": null
+    },
+    {
+      "rid": "202603020930",
+      "operator": "Southeastern",
+      "aimedDeparture": "09:30",
+      "expectedDeparture": null,
+      "aimedArrival": "10:00",
+      "expectedArrival": null,
+      "platform": null,
+      "status": "Cancelled",
+      "delayMins": null
+    }
+  ]
+}
