@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import stationsUkData from "@/data/stations.uk.json";
+import stationsUkData from "@/data/stations-uk.json";
 
 type Station = {
   crs: string;

@@ -102,9 +102,9 @@ Station typeahead is a high-frequency interaction. Calling paid/free-tier upstre
 for every station query risks exhausting daily limits and can degrade UX when the network is slow.
 
 ### Decision
-- `/api/stations` uses a checked-in local station dataset (`data/stations.uk.json`) as its source.
+- `/api/stations` uses a checked-in local station dataset (`data/stations-uk.json`) as its source.
 - Station search is fully local and does not call TransportAPI.
-- Dataset refresh is manual monthly for now via `node scripts/refresh-stations.mjs` using local source input (`data/stations.json`).
+- Dataset refresh is manual monthly for now via `node scripts/refresh-stations.mjs` using local source input (`data/stations-uk.json`).
 
 ### Rationale
 - Keeps station lookup fast and reliable.
@@ -119,3 +119,32 @@ Pros:
 Cons:
 - Dataset can be stale between refreshes.
 - Requires manual monthly refresh discipline until a stable automated source is adopted.
+
+## ADR-007: Darwin Pivot with Provider Abstraction
+
+### Context
+TransportAPI station feeds are useful for near-real-time departures but can be unreliable for historical
+Delay Repay scenarios. We need provider flexibility to switch to Darwin-backed sources without rewriting
+API routes.
+
+### Decision
+- Introduce a provider abstraction (`lib/providers/journeys-provider.ts`) as the orchestration layer for `/api/journeys`.
+- Keep `/api/journeys` route focused on input validation and response shaping only.
+- Integrate Darwin-related implementations under `lib/darwin/` (fixture + HSP live paths).
+- Gate upstream providers with feature flags:
+  - `DARWIN_MODE=off|fixture`
+  - `USE_HSP=1` for Darwin HSP historical fallback
+  - `TRANSPORT_API_ENABLED=1` to explicitly allow TransportAPI execution
+
+### Rationale
+- Reduces duplication and provider-specific logic in route handlers.
+- Makes data-source migration incremental and safer.
+- Keeps credentials and upstream complexity server-side only.
+
+### Consequences
+Pros:
+- Cleaner separation of concerns and simpler route maintenance.
+- Faster iteration for Darwin enrichment (operator mapping, details-on-expand, cancellation semantics).
+
+Cons:
+- Added internal module surface area and coordination between provider/util layers.

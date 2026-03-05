@@ -1,4 +1,4 @@
-import stations from "@/data/stations.json";
+import stations from "@/data/stations-uk.json";
 
 type StationRow = {
   crs: string;

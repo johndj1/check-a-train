@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 
-const LOCAL_SOURCE_PATH = "data/stations.json";
-const OUTPUT_PATH = "data/stations.uk.json";
+const LOCAL_SOURCE_PATH = "data/stations-uk.json";
+const OUTPUT_PATH = "data/stations-uk.json";
 
 function normalizeName(name) {
   return String(name ?? "").trim().replace(/\s+/g, " ");
@@ -63,7 +63,7 @@ async function main() {
   await writeFile(OUTPUT_PATH, `${JSON.stringify(stations, null, 2)}\n`, "utf8");
   console.log(`Wrote ${stations.length} stations to ${OUTPUT_PATH}.`);
   console.log(
-    "Refresh policy: run this manually once per month after updating data/stations.json from an approved source."
+    "Refresh policy: run this manually once per month after updating data/stations-uk.json from an approved source."
   );
 }
 
