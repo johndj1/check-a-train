@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DarwinFixtureFetchParams, DarwinNormalizedService } from "@/lib/darwin/types";
+import { deriveDelayAndStatus } from "@/lib/status/deriveDelayAndStatus";
 import { hhmmToMins } from "@/lib/time/hhmm";
 import { absDeltaMins, isWithinWindow } from "@/lib/time/window";
-
-type FixtureStatus = "On time" | "Delayed" | "Cancelled" | "Unknown";
 
 type FixtureService = {
   rid: string;
@@ -14,7 +13,7 @@ type FixtureService = {
   aimedArrival: string | null;
   expectedArrival: string | null;
   platform: string | null;
-  status: FixtureStatus;
+  status: string;
   delayMins: number | null;
 };
 
@@ -38,11 +37,6 @@ function toHHMM(v: string | null) {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-function toStatus(v: string): DarwinNormalizedService["status"] {
-  if (v === "On time" || v === "Delayed" || v === "Cancelled") return v;
-  return "Unknown";
-}
-
 function filterTime(service: DarwinNormalizedService) {
   return service.expectedDeparture ?? service.aimedDeparture;
 }
@@ -56,20 +50,37 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
     throw new Error("Invalid query time for Darwin fixture provider.");
   }
 
-  const baseServices: DarwinNormalizedService[] = (payload.services ?? []).map((service, idx) => ({
-    uid: `DARWIN:${service.rid || idx}`,
-    operator: service.operator ?? null,
-    operatorName: service.operator ?? "Unknown",
-    platform: service.platform,
-    originName: query.from.toUpperCase(),
-    destinationName: query.to.toUpperCase(),
-    aimedDeparture: toHHMM(service.aimedDeparture),
-    expectedDeparture: toHHMM(service.expectedDeparture),
-    delayMins: typeof service.delayMins === "number" ? service.delayMins : null,
-    status: toStatus(service.status),
-    callsAtTo: undefined,
-    _timetableId: service.rid,
-  }));
+  const baseServices: DarwinNormalizedService[] = (payload.services ?? []).map((service, idx) => {
+    const aimedDeparture = toHHMM(service.aimedDeparture);
+    const expectedDeparture = toHHMM(service.expectedDeparture);
+    const aimedArrival = toHHMM(service.aimedArrival) ?? "";
+    const expectedArrival = toHHMM(service.expectedArrival);
+    const cancelled = String(service.status ?? "").toUpperCase().includes("CANC");
+    const { delayMins, status } = deriveDelayAndStatus({
+      cancelled,
+      aimedArr: aimedArrival || null,
+      expectedArr: expectedArrival,
+      aimedDep: aimedDeparture,
+      expectedDep: expectedDeparture,
+    });
+
+    return {
+      uid: `DARWIN:${service.rid || idx}`,
+      operator: service.operator ?? null,
+      operatorName: service.operator ?? "Unknown",
+      platform: service.platform,
+      originName: query.from.toUpperCase(),
+      destinationName: query.to.toUpperCase(),
+      aimedDeparture,
+      expectedDeparture,
+      aimedArrival,
+      expectedArrival,
+      delayMins,
+      status,
+      callsAtTo: undefined,
+      _timetableId: service.rid,
+    };
+  });
 
   const withinWindow = baseServices
     .flatMap((service) => {

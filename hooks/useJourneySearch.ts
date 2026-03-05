@@ -11,6 +11,8 @@ export type Service = {
 
   aimedDeparture: string | null; // HH:MM or null
   expectedDeparture: string | null; // HH:MM or null
+  aimedArrival: string | ""; // HH:MM or empty string
+  expectedArrival: string | null; // HH:MM or null
   delayMins: number | null;
 
   status: "On time" | "Delayed" | "Cancelled" | "Unknown";

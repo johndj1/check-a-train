@@ -7,6 +7,8 @@ export type DarwinNormalizedService = {
   destinationName: string;
   aimedDeparture: string | null;
   expectedDeparture: string | null;
+  aimedArrival: string | "";
+  expectedArrival: string | null;
   delayMins: number | null;
   status: "On time" | "Delayed" | "Cancelled" | "Unknown";
   callsAtTo?: boolean;

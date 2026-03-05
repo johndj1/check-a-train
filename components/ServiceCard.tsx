@@ -33,16 +33,20 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const platform = service.platform ?? null;
   const aimedDeparture = service.aimedDeparture ?? "—";
   const expectedDeparture = service.expectedDeparture ?? null;
-  const delayMins = typeof service.delayMins === "number" ? service.delayMins : null;
+  const aimedArrival = service.aimedArrival ?? "";
+  const expectedArrival = service.expectedArrival ?? null;
   const callsAtTo = service.callsAtTo;
   const status: Service["status"] =
+    service.status === "On time" ||
     service.status === "Delayed" ||
     service.status === "Cancelled" ||
     service.status === "Unknown"
       ? service.status
-      : "On time";
+      : "Unknown";
+  const delayMins =
+    status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
 
-  const arrival = expectedDeparture ?? aimedDeparture;
+  const arrival = expectedArrival ?? (aimedArrival || "—");
 
   const claimPack = [
     `Service UID: ${uid}`,
@@ -52,6 +56,8 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     `Status: ${status}`,
     `Aimed departure: ${aimedDeparture}`,
     `Expected departure: ${expectedDeparture ?? "Unknown"}`,
+    `Aimed arrival: ${aimedArrival || "Unknown"}`,
+    `Expected arrival: ${expectedArrival ?? "Unknown"}`,
     `Delay: ${formatDelay(delayMins)}`,
     `Calls at destination: ${callsAtTo == null ? "Unknown" : callsAtTo ? "Yes" : "No"}`,
   ].join("\n");
@@ -135,6 +141,12 @@ export default function ServiceCard({ service }: ServiceCardProps) {
             </div>
             <div>
               <span className="text-zinc-400">Expected departure:</span> {expectedDeparture ?? "—"}
+            </div>
+            <div>
+              <span className="text-zinc-400">Aimed arrival:</span> {aimedArrival || "—"}
+            </div>
+            <div>
+              <span className="text-zinc-400">Expected arrival:</span> {expectedArrival ?? "—"}
             </div>
             <div>
               <span className="text-zinc-400">Delay:</span> {formatDelay(delayMins)}

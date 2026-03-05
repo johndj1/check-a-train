@@ -5,6 +5,7 @@ import type {
   HspServiceMetricsRequest,
   HspServicesParams,
 } from "@/lib/darwin/types";
+import { deriveDelayAndStatus } from "@/lib/status/deriveDelayAndStatus";
 import { hhmmToMins } from "@/lib/time/hhmm";
 
 type HspServiceMetric = {
@@ -85,16 +86,6 @@ function toHHMM(v: unknown): string | null {
   const mm = Number(colon[2]);
   if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
-}
-
-function diffMins(aimed: string, actual: string) {
-  const a = hhmmToMins(aimed);
-  const b = hhmmToMins(actual);
-  if (a == null || b == null) return null;
-  let d = b - a;
-  if (d < -720) d += 1440;
-  if (d > 720) d -= 1440;
-  return d;
 }
 
 function extractRid(serviceObj: Record<string, unknown>) {
@@ -208,6 +199,8 @@ export async function fetchHspServices(params: HspServicesParams) {
     destinationName: params.to.toUpperCase(),
     aimedDeparture: toHHMM(metric.gbttPtd),
     expectedDeparture: null,
+    aimedArrival: "",
+    expectedArrival: null,
     delayMins: null,
     status: "Unknown",
     callsAtTo: undefined,
@@ -227,25 +220,24 @@ export async function fetchHspServices(params: HspServicesParams) {
         const cancelled =
           Boolean(details.lateCancelReason) ||
           Boolean(toLoc && pickString(toLoc, ["late_canc_reason", "lateCancelReason"]));
-        if (cancelled) {
-          return { uid: service.uid, delayMins: null, status: "Cancelled" as const };
-        }
 
         const aimedArrival = toHHMM(toLoc ? pickString(toLoc, ["gbtt_pta"]) : null);
         const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
         const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
         const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
-        const delay =
-          aimedArrival && actualArrival
-            ? diffMins(aimedArrival, actualArrival)
-            : aimedDeparture && actualDeparture
-              ? diffMins(aimedDeparture, actualDeparture)
-              : null;
+        const { delayMins, status } = deriveDelayAndStatus({
+          cancelled,
+          aimedArr: aimedArrival,
+          expectedArr: actualArrival,
+          aimedDep: aimedDeparture,
+          expectedDep: actualDeparture,
+        });
         return {
           uid: service.uid,
-          delayMins: delay,
-          status:
-            delay === null ? ("Unknown" as const) : delay > 0 ? ("Delayed" as const) : ("On time" as const),
+          aimedArrival: aimedArrival ?? "",
+          expectedArrival: actualArrival,
+          delayMins,
+          status,
         };
       } catch {
         return null;
@@ -259,7 +251,13 @@ export async function fetchHspServices(params: HspServicesParams) {
   const services = baseServices.map((service) => {
     const detail = byUid.get(service.uid);
     if (!detail) return service;
-    return { ...service, delayMins: detail.delayMins, status: detail.status };
+    return {
+      ...service,
+      aimedArrival: detail.aimedArrival,
+      expectedArrival: detail.expectedArrival,
+      delayMins: detail.delayMins,
+      status: detail.status,
+    };
   });
 
   return {

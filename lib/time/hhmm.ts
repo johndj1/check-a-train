@@ -23,3 +23,13 @@ export function addMinutes(hhmm: string, minsToAdd: number) {
   if (base == null || !Number.isFinite(minsToAdd)) return null;
   return minsToHHMM(base + minsToAdd);
 }
+
+export function diffHHMM(aimed: string, expected: string) {
+  const aimedMins = hhmmToMins(aimed);
+  const expectedMins = hhmmToMins(expected);
+  if (aimedMins == null || expectedMins == null) return null;
+  let delta = expectedMins - aimedMins;
+  if (delta < -720) delta += 1440;
+  if (delta > 720) delta -= 1440;
+  return delta;
+}

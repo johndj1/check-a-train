@@ -191,6 +191,31 @@ function deriveStatus(rawStatus, delayMins) {
   return "Unknown";
 }
 
+function deriveDelayAndStatus({ cancelled, aimedArr, expectedArr, aimedDep, expectedDep }) {
+  if (cancelled) {
+    return { delayMins: null, status: "Cancelled" };
+  }
+  if (aimedArr && expectedArr) {
+    const arrivalDelay = diffMins(aimedArr, expectedArr);
+    if (arrivalDelay !== null) {
+      return {
+        delayMins: arrivalDelay,
+        status: arrivalDelay > 0 ? "Delayed" : "On time",
+      };
+    }
+  }
+  if (aimedDep && expectedDep) {
+    const departureDelay = diffMins(aimedDep, expectedDep);
+    if (departureDelay !== null) {
+      return {
+        delayMins: departureDelay,
+        status: departureDelay > 0 ? "Delayed" : "On time",
+      };
+    }
+  }
+  return { delayMins: null, status: "Unknown" };
+}
+
 function parseDarwinFixtureServices() {
   const departuresXml = readFileSync("fixtures/darwin/departures.xml", "utf8");
   const detailsXml = readFileSync("fixtures/darwin/service-details.xml", "utf8");
@@ -398,6 +423,63 @@ function assertDelayCalculationRegression() {
   }
 }
 
+function assertDelayAndStatusDerivationRegression() {
+  const caseA = deriveDelayAndStatus({
+    cancelled: false,
+    aimedArr: "09:00",
+    expectedArr: "09:12",
+    aimedDep: "08:30",
+    expectedDep: "08:35",
+  });
+  if (caseA.delayMins !== 12 || caseA.status !== "Delayed") {
+    throw new Error(`Derivation regression case A failed: ${JSON.stringify(caseA)}`);
+  }
+
+  const caseB = deriveDelayAndStatus({
+    cancelled: false,
+    aimedArr: "09:00",
+    expectedArr: "09:00",
+    aimedDep: "08:30",
+    expectedDep: "08:35",
+  });
+  if (caseB.delayMins !== 0 || caseB.status !== "On time") {
+    throw new Error(`Derivation regression case B failed: ${JSON.stringify(caseB)}`);
+  }
+
+  const caseC = deriveDelayAndStatus({
+    cancelled: false,
+    aimedArr: null,
+    expectedArr: null,
+    aimedDep: "08:30",
+    expectedDep: "08:35",
+  });
+  if (caseC.delayMins !== 5 || caseC.status !== "Delayed") {
+    throw new Error(`Derivation regression case C failed: ${JSON.stringify(caseC)}`);
+  }
+
+  const caseD = deriveDelayAndStatus({
+    cancelled: false,
+    aimedArr: "09:00",
+    expectedArr: null,
+    aimedDep: "08:30",
+    expectedDep: null,
+  });
+  if (caseD.delayMins !== null || caseD.status !== "Unknown") {
+    throw new Error(`Derivation regression case D failed: ${JSON.stringify(caseD)}`);
+  }
+
+  const caseE = deriveDelayAndStatus({
+    cancelled: true,
+    aimedArr: "09:00",
+    expectedArr: "09:12",
+    aimedDep: "08:30",
+    expectedDep: "08:35",
+  });
+  if (caseE.delayMins !== null || caseE.status !== "Cancelled") {
+    throw new Error(`Derivation regression case E failed: ${JSON.stringify(caseE)}`);
+  }
+}
+
 function assertDarwinFixtureRegression() {
   const services = parseDarwinFixtureServices();
   if (services.length < 4) {
@@ -483,6 +565,7 @@ assertChooseSourceRegression();
 assertJourneysUrlBuilderRegression();
 assertStationsLocalSearchRegression();
 assertDelayCalculationRegression();
+assertDelayAndStatusDerivationRegression();
 assertDarwinFixtureRegression();
 assertHspHelpersRegression();
 
