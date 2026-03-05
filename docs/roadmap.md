@@ -12,14 +12,15 @@
 - JR-006 — Timetable fallback for non-now queries (avoid empty results) — todo
 - JR-004 — Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg — done
 - JR-005 — Derive service status from planned vs expected times — todo
-- JR-006 — Switch /api/journeys to TransportAPI Journey Planner (from -> to) — in-progress
+- JR-009 — Switch /api/journeys to TransportAPI Journey Planner (from -> to) — in-progress
 - JR-007 — Fetch service timetable on card expand to confirm destination calling point — todo
 - JR-008 — Make time-window filtering resilient (avoid empty results + explain when empty) — todo
 
 ## Phase 3 — Delay Repay Engine
 - DR-001 — Multi-leg journeys + choose delayed leg (or whole journey) — todo
 - DR-002 — Delay Repay handoff by operator + copy-pack — todo
-- DR-003 — Integrate live rail running data — in-progress
+- DR-003 — Integrate live rail running data — done
+- DR-011 — Integrate Darwin real-time feed behind feature flag (live + fixture modes) — todo
 - DR-004 — Calculate Delay Repay eligibility — todo
 - DR-005 — Journey cards with expandable details — done
 - DR-006 — Operator Delay Repay handoff — done

@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-03-05
+- DR-003 — Integrate live rail running data
+
 ## 2026-03-04
 - PB-003 — Record architectural decisions
 - JR-004 — Fix journey/service summary fields (dep/arr) to reflect whole journey or selected leg
