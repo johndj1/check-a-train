@@ -2,6 +2,7 @@
 
 ## 2026-03-05
 - DR-003 — Integrate live rail running data
+- DR-011 — Integrate Darwin real-time feed behind feature flag (live + fixture modes)
 
 ## 2026-03-04
 - PB-003 — Record architectural decisions

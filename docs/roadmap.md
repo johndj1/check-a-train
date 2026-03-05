@@ -20,7 +20,7 @@
 - DR-001 — Multi-leg journeys + choose delayed leg (or whole journey) — todo
 - DR-002 — Delay Repay handoff by operator + copy-pack — todo
 - DR-003 — Integrate live rail running data — done
-- DR-011 — Integrate Darwin real-time feed behind feature flag (live + fixture modes) — todo
+- DR-011 — Integrate Darwin real-time feed behind feature flag (live + fixture modes) — done
 - DR-004 — Calculate Delay Repay eligibility — todo
 - DR-005 — Journey cards with expandable details — done
 - DR-006 — Operator Delay Repay handoff — done
