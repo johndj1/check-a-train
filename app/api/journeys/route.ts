@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getJourneysFromProvider, JourneyProviderError } from "@/lib/providers/journeys-provider";
+import { emitProductSignal } from "@/lib/productos-signal";
 
 function toHHMM(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -69,6 +70,34 @@ export async function GET(req: Request) {
       filterDest,
     });
 
+    const delayedServices = providerResult.services.filter(
+      (service) =>
+        service.status === "Delayed" ||
+        (typeof service.delayMins === "number" && service.delayMins > 0),
+    );
+
+    for (const service of delayedServices.slice(0, 5)) {
+      void emitProductSignal("delay_detected", {
+        from,
+        to,
+        date,
+        time,
+        window_mins: windowMins,
+        provider_source: providerResult.source,
+        service_uid: service.uid,
+        operator: service.operator,
+        operator_name: service.operatorName,
+        origin_name: service.originName,
+        destination_name: service.destinationName,
+        status: service.status,
+        delay_mins: service.delayMins,
+        aimed_departure: service.aimedDeparture,
+        expected_departure: service.expectedDeparture,
+        aimed_arrival: service.aimedArrival,
+        expected_arrival: service.expectedArrival,
+      });
+    }
+
     return NextResponse.json({
       query: { from, to, date, time, window: windowMins },
       services: providerResult.services,
@@ -78,13 +107,22 @@ export async function GET(req: Request) {
   } catch (err) {
     if (err instanceof JourneyProviderError) {
       return NextResponse.json(
-        { error: "Provider error", message: err.message },
+        {
+          error: err.publicMessage,
+          retryable: err.retryable,
+          failureClass: err.failureClass,
+        },
         { status: err.status }
       );
     }
 
     console.error("❌ /api/journeys error:", err);
-    const message = err instanceof Error ? err.message : "Unknown server error";
-    return NextResponse.json({ error: "Server error", message }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: "Something went wrong while loading journeys. Please try again.",
+        retryable: true,
+      },
+      { status: 500 }
+    );
   }
 }

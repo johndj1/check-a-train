@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import type { Service } from "@/hooks/useJourneySearch";
+import { getOperator } from "@/lib/operators";
 
 type ServiceCardProps = {
   service: Partial<Service> | null | undefined;
@@ -45,8 +46,19 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       : "Unknown";
   const delayMins =
     status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
+  const operator = getOperator(service.operator);
 
   const arrival = expectedArrival ?? (aimedArrival || "—");
+  const claimHref = operator
+    ? `/api/claim/start?${new URLSearchParams({
+        operator: operator.code,
+        serviceUid: uid,
+        originName,
+        destinationName,
+        status,
+        delayMins: delayMins === null ? "" : String(delayMins),
+      }).toString()}`
+    : null;
 
   const claimPack = [
     `Service UID: ${uid}`,
@@ -96,6 +108,15 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
+          {claimHref && (
+            <a
+              href={claimHref}
+              className="rounded-xl bg-amber-300 px-3 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-200"
+            >
+              Claim Delay Repay
+            </a>
+          )}
+
           <button
             type="button"
             onClick={onCopyDetails}

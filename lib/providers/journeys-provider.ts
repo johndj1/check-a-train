@@ -1,5 +1,7 @@
 import { getFixtureJourneys } from "@/lib/darwin/fixture";
+import { DarwinHttpError, DarwinTimeoutError } from "@/lib/darwin/client";
 import { fetchHspServices, HspCredentialsError } from "@/lib/darwin/hsp";
+import { emitProductSignal } from "@/lib/productos-signal";
 import type { DarwinNormalizedService } from "@/lib/darwin/types";
 
 export type JourneyProviderQuery = {
@@ -17,13 +19,40 @@ export type JourneyProviderResult = {
   note: string;
 };
 
+export type JourneyProviderFailureClass =
+  | "credentials_missing"
+  | "timeout"
+  | "rate_limited"
+  | "provider_unavailable"
+  | "provider_rejected_request"
+  | "unexpected";
+
+type JourneyProviderFailure = {
+  failureClass: JourneyProviderFailureClass;
+  retryable: boolean;
+  status: number;
+  publicMessage: string;
+  technicalMessage: string;
+  upstreamStatus: number | null;
+};
+
 export class JourneyProviderError extends Error {
   status: number;
+  retryable: boolean;
+  failureClass: JourneyProviderFailureClass;
+  publicMessage: string;
+  technicalMessage: string;
+  upstreamStatus: number | null;
 
-  constructor(message: string, status = 502) {
-    super(message);
+  constructor(failure: JourneyProviderFailure) {
+    super(failure.technicalMessage);
     this.name = "JourneyProviderError";
-    this.status = status;
+    this.status = failure.status;
+    this.retryable = failure.retryable;
+    this.failureClass = failure.failureClass;
+    this.publicMessage = failure.publicMessage;
+    this.technicalMessage = failure.technicalMessage;
+    this.upstreamStatus = failure.upstreamStatus;
   }
 }
 
@@ -51,6 +80,72 @@ function toHHMM(v: unknown): string | null {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
+  if (error instanceof HspCredentialsError) {
+    return {
+      failureClass: "credentials_missing",
+      retryable: false,
+      status: 503,
+      publicMessage: "Live train data is unavailable right now. Please try again later.",
+      technicalMessage: error.message,
+      upstreamStatus: null,
+    };
+  }
+
+  if (error instanceof DarwinTimeoutError) {
+    return {
+      failureClass: "timeout",
+      retryable: true,
+      status: 503,
+      publicMessage: "Live train data is taking too long to respond. Please try again.",
+      technicalMessage: error.message,
+      upstreamStatus: null,
+    };
+  }
+
+  if (error instanceof DarwinHttpError) {
+    if (error.status === 429) {
+      return {
+        failureClass: "rate_limited",
+        retryable: true,
+        status: 503,
+        publicMessage: "Live train data is busy right now. Please try again shortly.",
+        technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
+        upstreamStatus: error.status,
+      };
+    }
+
+    if (error.status >= 500) {
+      return {
+        failureClass: "provider_unavailable",
+        retryable: true,
+        status: 503,
+        publicMessage: "Live train data is unavailable right now. Please try again.",
+        technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
+        upstreamStatus: error.status,
+      };
+    }
+
+    return {
+      failureClass: "provider_rejected_request",
+      retryable: false,
+      status: 502,
+      publicMessage: "We couldn't load live train data for this search right now.",
+      technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
+      upstreamStatus: error.status,
+    };
+  }
+
+  return {
+    failureClass: "unexpected",
+    retryable: true,
+    status: 503,
+    publicMessage: "We couldn't load live train data right now. Please try again.",
+    technicalMessage: error instanceof Error ? error.message : "Unknown Darwin provider error",
+    upstreamStatus: null,
+  };
+}
+
 async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
   try {
     const hsp = await fetchHspServices({
@@ -68,16 +163,23 @@ async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProvi
       note: `Using Darwin HSP live data (DARWIN_MODE=live) with query ${hsp.query.from_time}-${hsp.query.to_time} ${hsp.query.days}.`,
     };
   } catch (err) {
-    if (err instanceof HspCredentialsError) {
-      throw new JourneyProviderError(
-        "DARWIN_MODE=live requires HSP_USERNAME and HSP_PASSWORD server-side credentials.",
-        502
-      );
-    }
-    throw new JourneyProviderError(
-      err instanceof Error ? `Darwin live provider failed: ${err.message}` : "Darwin live provider failed.",
-      502
-    );
+    const failure = classifyDarwinFailure(err);
+
+    void emitProductSignal("darwin_api_error", {
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      time: query.time,
+      window_mins: query.windowMins,
+      provider: "darwin.hsp",
+      failure_class: failure.failureClass,
+      retryable: failure.retryable,
+      endpoint_context: "journey_search",
+      upstream_status: failure.upstreamStatus,
+      technical_message: failure.technicalMessage,
+    });
+
+    throw new JourneyProviderError(failure);
   }
 }
 
@@ -104,15 +206,24 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
   } else if (darwinMode === "live") {
     result = await getHspJourneys({ ...query, time: normalizedTime });
   } else if (darwinMode === "off") {
-    throw new JourneyProviderError(
-      "Darwin provider is disabled (DARWIN_MODE=off). Set DARWIN_MODE=fixture or DARWIN_MODE=live.",
-      502
-    );
+    throw new JourneyProviderError({
+      failureClass: "provider_unavailable",
+      retryable: false,
+      status: 503,
+      publicMessage: "Live train data is unavailable right now. Please try again later.",
+      technicalMessage:
+        "Darwin provider is disabled (DARWIN_MODE=off). Set DARWIN_MODE=fixture or DARWIN_MODE=live.",
+      upstreamStatus: null,
+    });
   } else {
-    throw new JourneyProviderError(
-      `Unsupported DARWIN_MODE='${darwinMode}'. Expected one of: fixture, live, off.`,
-      500
-    );
+    throw new JourneyProviderError({
+      failureClass: "unexpected",
+      retryable: false,
+      status: 500,
+      publicMessage: "Live train data is unavailable right now. Please try again later.",
+      technicalMessage: `Unsupported DARWIN_MODE='${darwinMode}'. Expected one of: fixture, live, off.`,
+      upstreamStatus: null,
+    });
   }
 
   if (process.env.NODE_ENV === "development") {

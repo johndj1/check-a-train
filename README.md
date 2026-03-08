@@ -1,36 +1,85 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Check-a-Train
 
-## Getting Started
+Check-a-Train is a Delay Repay assistant built with Next.js. It fetches live or fixture-backed train running data, highlights delayed services, and routes users into the right operator claim flow.
 
-First, run the development server:
+## Local Run
+
+Install dependencies and start the app:
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Signals To Product OS
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Check-a-Train can emit product signals to Product OS from server-side code. Signals are lightweight JSON events that describe meaningful product behaviour such as:
 
-## Learn More
+- `delay_detected`
+- `claim_started`
+- `darwin_api_error`
 
-To learn more about Next.js, take a look at the following resources:
+Signal emission is handled by [`lib/productos-signal.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/productos-signal.ts). The helper sends a JSON `POST` to the configured Product OS endpoint and never throws into the user flow. If Product OS is unavailable, Check-a-Train logs a warning and continues normally.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Configuration
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Set the Product OS endpoint in `.env.local`:
 
-## Deploy on Vercel
+```bash
+PRODUCT_OS_SIGNAL_ENDPOINT=http://localhost:3000/api/signals
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The endpoint is not hardcoded. Check-a-Train reads it from `PRODUCT_OS_SIGNAL_ENDPOINT` for every emitted signal.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### Current Emission Points
+
+- [`app/api/journeys/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/journeys/route.ts): emits `delay_detected` for delayed services returned by the server-side journey lookup.
+- [`app/api/claim/start/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/claim/start/route.ts): emits `claim_started` on the server before redirecting the user to the operator claim page.
+- [`lib/providers/journeys-provider.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/providers/journeys-provider.ts): emits `darwin_api_error` when Darwin/HSP live lookup fails.
+
+### Example Payloads
+
+`delay_detected`
+
+```json
+{
+  "product_slug": "check-a-train",
+  "signal_name": "delay_detected",
+  "timestamp": "2026-03-08T10:15:00.000Z",
+  "metadata": {
+    "from": "SEV",
+    "to": "LBG",
+    "service_uid": "DARWIN:20260305SEV002",
+    "operator_name": "Southeastern",
+    "status": "Delayed",
+    "delay_mins": 8
+  }
+}
+```
+
+`claim_started`
+
+```json
+{
+  "product_slug": "check-a-train",
+  "signal_name": "claim_started",
+  "timestamp": "2026-03-08T10:16:00.000Z",
+  "metadata": {
+    "operator": "SE",
+    "operator_name": "Southeastern",
+    "service_uid": "DARWIN:20260305SEV002",
+    "origin_name": "Sevenoaks",
+    "destination_name": "London Bridge",
+    "status": "Delayed",
+    "delay_mins": 8
+  }
+}
+```
+
+## Notes
+
+- Signal delivery is best-effort only.
+- No authentication is added yet.
+- Signal failures do not block journey results or claim handoff.

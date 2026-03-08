@@ -106,6 +106,7 @@ export default function HomeClient() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryableError, setRetryableError] = useState(false);
   const [submittedState, setSubmittedState] = useState(submitted);
   const [queryView, setQueryView] = useState({
     fromName: fromUrl,
@@ -124,6 +125,13 @@ export default function HomeClient() {
     time: string;
     windowMins: number;
   }) {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) {
+      setServices([]);
+      setRetryableError(true);
+      setError("You appear to be offline. Check your connection and try again.");
+      return;
+    }
+
     const url =
       `/api/journeys?from=${encodeURIComponent(args.fromCode)}` +
       `&to=${encodeURIComponent(args.toCode)}` +
@@ -137,6 +145,7 @@ export default function HomeClient() {
 
     setLoading(true);
     setError(null);
+    setRetryableError(false);
     try {
       const res = await fetch(url);
       if (process.env.NODE_ENV === "development") {
@@ -144,7 +153,9 @@ export default function HomeClient() {
       }
       const raw = await res.text();
       const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
-      const data = isJson ? (JSON.parse(raw) as { services?: Service[]; error?: string }) : null;
+      const data = isJson
+        ? (JSON.parse(raw) as { services?: Service[]; error?: string; retryable?: boolean })
+        : null;
       if (!res.ok) {
         const msg =
           data?.error ??
@@ -153,15 +164,18 @@ export default function HomeClient() {
             : raw.slice(0, 200)) ??
           "Failed to fetch journeys.";
         setServices([]);
+        setRetryableError(Boolean(data?.retryable) || res.status >= 500);
         setError(msg);
         return;
       }
       if (!data || !Array.isArray(data.services)) {
         setServices([]);
+        setRetryableError(true);
         setError("API returned non-JSON response. Check /api/journeys in the browser.");
         return;
       }
       setServices(data.services);
+      setRetryableError(false);
     } catch (e) {
       const err = e as Error;
       if (process.env.NODE_ENV === "development") {
@@ -173,10 +187,22 @@ export default function HomeClient() {
         });
       }
       setServices([]);
+      setRetryableError(true);
       setError("Network error while fetching journeys.");
     } finally {
       setLoading(false);
     }
+  }
+
+  function retryLastSearch() {
+    if (!submittedState) return;
+    void runJourneyFetch({
+      fromCode: queryView.fromCode,
+      toCode: queryView.toCode,
+      date: queryView.date,
+      time: queryView.time,
+      windowMins: queryView.windowMins,
+    });
   }
 
   useEffect(() => {
@@ -250,6 +276,7 @@ export default function HomeClient() {
   function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setRetryableError(false);
 
     const f = from.trim();
     const t = to.trim();
@@ -301,6 +328,7 @@ export default function HomeClient() {
 
   function onReset() {
     setError(null);
+    setRetryableError(false);
     setFrom("");
     setTo("");
     setFromCode("");
@@ -430,8 +458,18 @@ export default function HomeClient() {
 
             <div className="md:col-span-2 flex flex-col gap-3">
               {error && (
-                <div className="rounded-xl border border-red-900/60 bg-red-950/40 px-3 py-2 text-sm text-red-200">
-                  {error}
+                <div className="rounded-xl border border-red-900/60 bg-red-950/40 px-3 py-3 text-sm text-red-200">
+                  <p>{error}</p>
+                  {retryableError && submittedState && (
+                    <button
+                      type="button"
+                      onClick={retryLastSearch}
+                      disabled={loading}
+                      className="mt-3 rounded-xl border border-red-700 px-3 py-2 text-xs font-semibold text-red-100 hover:bg-red-900/30 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {loading ? "Retrying…" : "Retry search"}
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -522,7 +560,7 @@ export default function HomeClient() {
               </div>
             )}
 
-            {!loading && services.length === 0 && (
+            {!loading && !error && services.length === 0 && (
               <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm text-zinc-300">
                 No services found for that window.
               </div>
