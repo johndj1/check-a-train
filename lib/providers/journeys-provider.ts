@@ -175,6 +175,8 @@ async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProvi
       failure_class: failure.failureClass,
       retryable: failure.retryable,
       endpoint_context: "journey_search",
+      journey_stage: "journey_lookup_failed",
+      user_outcome: "live_results_unavailable",
       upstream_status: failure.upstreamStatus,
       technical_message: failure.technicalMessage,
     });

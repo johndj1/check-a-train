@@ -1,5 +1,6 @@
 const PRODUCT_SLUG = "check-a-train";
 const REQUEST_TIMEOUT_MS = 1500;
+const LIVE_PROVIDER_SOURCE_PREFIX = "darwin.hsp";
 
 export type ProductSignalMetadata = Record<string, unknown>;
 
@@ -9,6 +10,14 @@ type ProductSignalBody = {
   timestamp: string;
   metadata: ProductSignalMetadata;
 };
+
+export function canEmitProductSignals() {
+  return Boolean(process.env.PRODUCT_OS_SIGNAL_ENDPOINT?.trim());
+}
+
+export function isRealUsageSignalContext(source: string | null | undefined) {
+  return typeof source === "string" && source.startsWith(LIVE_PROVIDER_SOURCE_PREFIX);
+}
 
 export async function emitProductSignal(signalName: string, payload: ProductSignalMetadata = {}) {
   const endpoint = process.env.PRODUCT_OS_SIGNAL_ENDPOINT?.trim();

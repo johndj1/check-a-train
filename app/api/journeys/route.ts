@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getJourneysFromProvider, JourneyProviderError } from "@/lib/providers/journeys-provider";
-import { emitProductSignal } from "@/lib/productos-signal";
+import { emitProductSignal, isRealUsageSignalContext } from "@/lib/productos-signal";
 
 function toHHMM(v: unknown): string | null {
   if (typeof v !== "string") return null;
@@ -76,26 +76,31 @@ export async function GET(req: Request) {
         (typeof service.delayMins === "number" && service.delayMins > 0),
     );
 
-    for (const service of delayedServices.slice(0, 5)) {
-      void emitProductSignal("delay_detected", {
-        from,
-        to,
-        date,
-        time,
-        window_mins: windowMins,
-        provider_source: providerResult.source,
-        service_uid: service.uid,
-        operator: service.operator,
-        operator_name: service.operatorName,
-        origin_name: service.originName,
-        destination_name: service.destinationName,
-        status: service.status,
-        delay_mins: service.delayMins,
-        aimed_departure: service.aimedDeparture,
-        expected_departure: service.expectedDeparture,
-        aimed_arrival: service.aimedArrival,
-        expected_arrival: service.expectedArrival,
-      });
+    if (isRealUsageSignalContext(providerResult.source)) {
+      for (const service of delayedServices.slice(0, 5)) {
+        void emitProductSignal("delay_detected", {
+          from,
+          to,
+          date,
+          time,
+          window_mins: windowMins,
+          provider_source: providerResult.source,
+          journey_stage: "delayed_service_presented",
+          user_outcome: "claim_opportunity_identified",
+          service_uid: service.uid,
+          operator: service.operator,
+          operator_name: service.operatorName,
+          operator_known: Boolean(service.operator),
+          origin_name: service.originName,
+          destination_name: service.destinationName,
+          status: service.status,
+          delay_mins: service.delayMins,
+          aimed_departure: service.aimedDeparture,
+          expected_departure: service.expectedDeparture,
+          aimed_arrival: service.aimedArrival,
+          expected_arrival: service.expectedArrival,
+        });
+      }
     }
 
     return NextResponse.json({

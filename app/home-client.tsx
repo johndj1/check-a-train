@@ -154,7 +154,7 @@ export default function HomeClient() {
       const raw = await res.text();
       const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
       const data = isJson
-        ? (JSON.parse(raw) as { services?: Service[]; error?: string; retryable?: boolean })
+        ? (JSON.parse(raw) as { services?: Service[]; source?: string; error?: string; retryable?: boolean })
         : null;
       if (!res.ok) {
         const msg =
@@ -174,7 +174,13 @@ export default function HomeClient() {
         setError("API returned non-JSON response. Check /api/journeys in the browser.");
         return;
       }
-      setServices(data.services);
+      const providerSource = typeof data.source === "string" ? data.source : null;
+      setServices(
+        data.services.map((service) => ({
+          ...service,
+          providerSource,
+        })),
+      );
       setRetryableError(false);
     } catch (e) {
       const err = e as Error;

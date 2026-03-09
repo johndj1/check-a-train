@@ -47,6 +47,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const delayMins =
     status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
   const operator = getOperator(service.operator);
+  const providerSource = typeof service.providerSource === "string" ? service.providerSource : "";
 
   const arrival = expectedArrival ?? (aimedArrival || "—");
   const claimHref = operator
@@ -57,6 +58,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         destinationName,
         status,
         delayMins: delayMins === null ? "" : String(delayMins),
+        providerSource,
       }).toString()}`
     : null;
 
@@ -72,6 +74,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     `Expected arrival: ${expectedArrival ?? "Unknown"}`,
     `Delay: ${formatDelay(delayMins)}`,
     `Calls at destination: ${callsAtTo == null ? "Unknown" : callsAtTo ? "Yes" : "No"}`,
+    `Provider source: ${providerSource || "Unknown"}`,
   ].join("\n");
 
   async function onCopyDetails() {

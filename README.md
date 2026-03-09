@@ -28,16 +28,17 @@ Signal emission is handled by [`lib/productos-signal.ts`](/Users/danjohn/Project
 Set the Product OS endpoint in `.env.local`:
 
 ```bash
-PRODUCT_OS_SIGNAL_ENDPOINT=http://localhost:3000/api/signals
+PRODUCT_OS_SIGNAL_ENDPOINT=http://localhost:3000/api/signals/ingest
 ```
 
 The endpoint is not hardcoded. Check-a-Train reads it from `PRODUCT_OS_SIGNAL_ENDPOINT` for every emitted signal.
+Only point this at Product OS in environments where the app is handling real user flows. Keep it unset for synthetic QA or fixture-only traffic.
 
 ### Current Emission Points
 
-- [`app/api/journeys/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/journeys/route.ts): emits `delay_detected` for delayed services returned by the server-side journey lookup.
-- [`app/api/claim/start/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/claim/start/route.ts): emits `claim_started` on the server before redirecting the user to the operator claim page.
-- [`lib/providers/journeys-provider.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/providers/journeys-provider.ts): emits `darwin_api_error` when Darwin/HSP live lookup fails.
+- [`app/api/journeys/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/journeys/route.ts): emits `delay_detected` only when a live Darwin/HSP-backed search returns delayed services that the user can act on.
+- [`app/api/claim/start/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/claim/start/route.ts): emits `claim_started` on the server before redirecting the user to the operator claim page, but only for handoffs that came from live Darwin/HSP results.
+- [`lib/providers/journeys-provider.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/providers/journeys-provider.ts): emits `darwin_api_error` when a real Darwin/HSP-backed journey lookup fails.
 
 ### Example Payloads
 
@@ -51,6 +52,8 @@ The endpoint is not hardcoded. Check-a-Train reads it from `PRODUCT_OS_SIGNAL_EN
   "metadata": {
     "from": "SEV",
     "to": "LBG",
+    "journey_stage": "delayed_service_presented",
+    "user_outcome": "claim_opportunity_identified",
     "service_uid": "DARWIN:20260305SEV002",
     "operator_name": "Southeastern",
     "status": "Delayed",
@@ -69,6 +72,8 @@ The endpoint is not hardcoded. Check-a-Train reads it from `PRODUCT_OS_SIGNAL_EN
   "metadata": {
     "operator": "SE",
     "operator_name": "Southeastern",
+    "journey_stage": "claim_handoff_started",
+    "user_outcome": "operator_claim_redirect_started",
     "service_uid": "DARWIN:20260305SEV002",
     "origin_name": "Sevenoaks",
     "destination_name": "London Bridge",
@@ -83,3 +88,4 @@ The endpoint is not hardcoded. Check-a-Train reads it from `PRODUCT_OS_SIGNAL_EN
 - Signal delivery is best-effort only.
 - No authentication is added yet.
 - Signal failures do not block journey results or claim handoff.
+- Signals are derived from existing user-driven behaviour only; Check-a-Train does not create extra Darwin/HSP requests just to feed Product OS.
