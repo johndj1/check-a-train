@@ -12,6 +12,7 @@ export type DarwinNormalizedService = {
   delayMins: number | null;
   status: "On time" | "Delayed" | "Cancelled" | "Unknown";
   callsAtTo?: boolean;
+  rawStatusText?: string | null;
   _timetableId?: string | null;
 };
 

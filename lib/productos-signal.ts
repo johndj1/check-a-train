@@ -1,6 +1,6 @@
 const PRODUCT_SLUG = "check-a-train";
 const REQUEST_TIMEOUT_MS = 1500;
-const LIVE_PROVIDER_SOURCE_PREFIX = "darwin.hsp";
+const LIVE_PROVIDER_SOURCE_PREFIX = "darwin.";
 
 export type ProductSignalMetadata = Record<string, unknown>;
 

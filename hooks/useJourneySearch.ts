@@ -5,6 +5,7 @@ export type Service = {
   operator: string | null;
   operatorName: string;
   platform: string | null;
+  providerSource?: string | null;
 
   originName: string;
   destinationName: string;

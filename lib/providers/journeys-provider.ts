@@ -1,6 +1,6 @@
 import { getFixtureJourneys } from "@/lib/darwin/fixture";
 import { DarwinHttpError, DarwinTimeoutError } from "@/lib/darwin/client";
-import { fetchHspServices, HspCredentialsError } from "@/lib/darwin/hsp";
+import { DarwinCredentialsError, fetchDarwinDepartureBoard } from "@/lib/darwin/ldbws";
 import { emitProductSignal } from "@/lib/productos-signal";
 import type { DarwinNormalizedService } from "@/lib/darwin/types";
 
@@ -81,7 +81,7 @@ function toHHMM(v: unknown): string | null {
 }
 
 function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
-  if (error instanceof HspCredentialsError) {
+  if (error instanceof DarwinCredentialsError) {
     return {
       failureClass: "credentials_missing",
       retryable: false,
@@ -146,22 +146,15 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
   };
 }
 
-async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
+async function getLiveBoardJourneys(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
   try {
-    const hsp = await fetchHspServices({
+    return await fetchDarwinDepartureBoard({
       from: query.from,
       to: query.to,
       date: query.date,
       time: query.time,
       windowMins: query.windowMins,
-      detailsLimit: 5,
     });
-
-    return {
-      services: hsp.services,
-      source: "darwin.hsp",
-      note: `Using Darwin HSP live data (DARWIN_MODE=live) with query ${hsp.query.from_time}-${hsp.query.to_time} ${hsp.query.days}.`,
-    };
   } catch (err) {
     const failure = classifyDarwinFailure(err);
 
@@ -171,7 +164,7 @@ async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProvi
       date: query.date,
       time: query.time,
       window_mins: query.windowMins,
-      provider: "darwin.hsp",
+      provider: "darwin.gateway",
       failure_class: failure.failureClass,
       retryable: failure.retryable,
       endpoint_context: "journey_search",
@@ -181,17 +174,42 @@ async function getHspJourneys(query: JourneyProviderQuery): Promise<JourneyProvi
       technical_message: failure.technicalMessage,
     });
 
+    console.error("[journeys-provider] live Darwin lookup failed", {
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      time: query.time,
+      failureClass: failure.failureClass,
+      retryable: failure.retryable,
+      upstreamStatus: failure.upstreamStatus,
+      technicalMessage: failure.technicalMessage,
+    });
+
     throw new JourneyProviderError(failure);
   }
 }
 
 export async function getJourneysFromProvider(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
   if (!parseISODate(query.date)) {
-    throw new JourneyProviderError("Invalid date format. Expected YYYY-MM-DD.", 400);
+    throw new JourneyProviderError({
+      failureClass: "provider_rejected_request",
+      retryable: false,
+      status: 400,
+      publicMessage: "Invalid date format. Expected YYYY-MM-DD.",
+      technicalMessage: "Invalid date format. Expected YYYY-MM-DD.",
+      upstreamStatus: null,
+    });
   }
   const normalizedTime = toHHMM(query.time);
   if (!normalizedTime) {
-    throw new JourneyProviderError("Invalid time format. Expected HH:MM.", 400);
+    throw new JourneyProviderError({
+      failureClass: "provider_rejected_request",
+      retryable: false,
+      status: 400,
+      publicMessage: "Invalid time format. Expected HH:MM.",
+      technicalMessage: "Invalid time format. Expected HH:MM.",
+      upstreamStatus: null,
+    });
   }
 
   const darwinMode = (process.env.DARWIN_MODE ?? "fixture").trim().toLowerCase();
@@ -206,7 +224,7 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
       windowMins: query.windowMins,
     });
   } else if (darwinMode === "live") {
-    result = await getHspJourneys({ ...query, time: normalizedTime });
+    result = await getLiveBoardJourneys({ ...query, time: normalizedTime });
   } else if (darwinMode === "off") {
     throw new JourneyProviderError({
       failureClass: "provider_unavailable",

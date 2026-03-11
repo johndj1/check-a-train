@@ -13,6 +13,32 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Darwin Live Board Setup
+
+Check-a-Train can call the Rail Data gateway `GetArrDepBoardWithDetails/{crs}` endpoint when `DARWIN_MODE=live`.
+
+Required env vars:
+
+```bash
+DARWIN_MODE=live
+DARWIN_API_KEY=your_rail_data_gateway_api_key
+DARWIN_BASE_URL=https://your-rail-data-gateway-base-url
+```
+
+You can start from [`.env.example`](/Users/danjohn/Projects/Code/check-a-train/.env.example). Keep secrets in `.env.local`, not in committed files.
+
+### Local Verification
+
+1. Set `DARWIN_MODE=live`, `DARWIN_API_KEY`, and `DARWIN_BASE_URL` in `.env.local`.
+2. Run `npm run dev`.
+3. Open a live search in the app, or call the existing route directly with a current-time query such as:
+
+```bash
+curl "http://localhost:3000/api/journeys?from=SEV&to=LBG&date=2026-03-11&time=08:30&window=30"
+```
+
+Use a live CRS such as `SEV` and a near-now time window. The route returns normalized `services`, a `source` of `darwin.gateway`, and a `note` describing the live provider.
+
 ## Signals To Product OS
 
 Check-a-Train can emit product signals to Product OS from server-side code. Signals are lightweight JSON events that describe meaningful product behaviour such as:
@@ -36,9 +62,9 @@ Only point this at Product OS in environments where the app is handling real use
 
 ### Current Emission Points
 
-- [`app/api/journeys/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/journeys/route.ts): emits `delay_detected` only when a live Darwin/HSP-backed search returns delayed services that the user can act on.
-- [`app/api/claim/start/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/claim/start/route.ts): emits `claim_started` on the server before redirecting the user to the operator claim page, but only for handoffs that came from live Darwin/HSP results.
-- [`lib/providers/journeys-provider.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/providers/journeys-provider.ts): emits `darwin_api_error` when a real Darwin/HSP-backed journey lookup fails.
+- [`app/api/journeys/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/journeys/route.ts): emits `delay_detected` only when a live Darwin-backed search returns delayed services that the user can act on.
+- [`app/api/claim/start/route.ts`](/Users/danjohn/Projects/Code/check-a-train/app/api/claim/start/route.ts): emits `claim_started` on the server before redirecting the user to the operator claim page, but only for handoffs that came from live Darwin results.
+- [`lib/providers/journeys-provider.ts`](/Users/danjohn/Projects/Code/check-a-train/lib/providers/journeys-provider.ts): emits `darwin_api_error` when a real Darwin lookup fails.
 
 ### Example Payloads
 
