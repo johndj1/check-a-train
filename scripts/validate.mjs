@@ -616,6 +616,22 @@ function assertHistoricalProviderSelectionRegression() {
   }
 }
 
+function assertHspTimeoutRegression() {
+  const hspSource = readFileSync("lib/darwin/hsp.ts", "utf8");
+
+  if (!hspSource.includes("const DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS = 12000")) {
+    throw new Error("HSP timeout regression: serviceMetrics must keep an explicit timeout budget.");
+  }
+
+  if (!hspSource.includes("process.env.HSP_METRICS_TIMEOUT_MS")) {
+    throw new Error("HSP timeout regression: serviceMetrics timeout must remain env-configurable.");
+  }
+
+  if (!hspSource.includes('{ timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS }')) {
+    throw new Error("HSP timeout regression: serviceMetrics must pass its explicit timeout to postJson.");
+  }
+}
+
 function assertDelayRepayOperatorHandoffRegression() {
   const operatorsSource = readFileSync("lib/operators.ts", "utf8");
   const serviceCardSource = readFileSync("components/ServiceCard.tsx", "utf8");
@@ -686,6 +702,7 @@ assertDelayAndStatusDerivationRegression();
 assertDarwinFixtureRegression();
 assertHspHelpersRegression();
 assertHistoricalProviderSelectionRegression();
+assertHspTimeoutRegression();
 assertDelayRepayOperatorHandoffRegression();
 
 for (const [cmd, args] of checks) {

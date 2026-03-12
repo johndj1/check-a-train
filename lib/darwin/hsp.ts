@@ -34,10 +34,22 @@ type HspServiceDetailSummary = {
   rawStatusText?: string | null;
 };
 
+const DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS = 12000;
 const HSP_SERVICE_DETAILS_TIMEOUT_MS = 12000;
 const HSP_MVP_DETAILS_LIMIT = 1;
 const HSP_DEBUG_TIMING_ENABLED =
   process.env.HSP_DEBUG_TIMING === "1" || process.env.NODE_ENV === "development";
+
+function parseTimeoutMs(value: string | undefined, fallback: number) {
+  const parsed = Number(value?.trim());
+  if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
+  return Math.floor(parsed);
+}
+
+const HSP_SERVICE_METRICS_TIMEOUT_MS = parseTimeoutMs(
+  process.env.HSP_METRICS_TIMEOUT_MS,
+  DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS,
+);
 
 export class HspCredentialsError extends Error {
   constructor(message = "Missing HSP credentials.") {
@@ -293,9 +305,14 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
   const config = getConfig();
   const startedAt = Date.now();
   try {
-    const payload = await postJson(`${config.baseUrl}/serviceMetrics`, query, {
-      "x-apikey": config.apiKey,
-    });
+    const payload = await postJson(
+      `${config.baseUrl}/serviceMetrics`,
+      query,
+      {
+        "x-apikey": config.apiKey,
+      },
+      { timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS },
+    );
     hspDebugLog("serviceMetrics response", {
       durationMs: Date.now() - startedAt,
       from: query.from_loc,
@@ -305,6 +322,7 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
       fromTime: query.from_time,
       toTime: query.to_time,
       days: query.days,
+      timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS,
     });
     return payload;
   } catch (error) {
@@ -317,6 +335,7 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
       fromTime: query.from_time,
       toTime: query.to_time,
       days: query.days,
+      timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS,
       error: error instanceof Error ? error.message : "Unknown error",
     });
     throw error;
