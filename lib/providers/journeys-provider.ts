@@ -1,6 +1,7 @@
 import { getFixtureJourneys } from "@/lib/darwin/fixture";
 import { DarwinHttpError, DarwinTimeoutError } from "@/lib/darwin/client";
 import { DarwinCredentialsError, fetchDarwinDepartureBoard } from "@/lib/darwin/ldbws";
+import { fetchHspJourneys, HspCredentialsError } from "@/lib/darwin/hsp";
 import { emitProductSignal } from "@/lib/productos-signal";
 import type {
   DarwinFirstPassStatus,
@@ -87,13 +88,22 @@ function toHHMM(v: unknown): string | null {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
+function isHistoricalSearch(dateStr: string) {
+  const queryDate = parseISODate(dateStr);
+  if (!queryDate) return false;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return queryDate.getTime() < today.getTime();
+}
+
 function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
-  if (error instanceof DarwinCredentialsError) {
+  if (error instanceof DarwinCredentialsError || error instanceof HspCredentialsError) {
     return {
       failureClass: "credentials_missing",
       retryable: false,
       status: 503,
-      publicMessage: "Live train data is unavailable right now. Please try again later.",
+      publicMessage: "Train running data is unavailable right now. Please try again later.",
       technicalMessage: error.message,
       upstreamStatus: null,
     };
@@ -104,7 +114,7 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
       failureClass: "timeout",
       retryable: true,
       status: 503,
-      publicMessage: "Live train data is taking too long to respond. Please try again.",
+      publicMessage: "Train running data is taking too long to respond. Please try again.",
       technicalMessage: error.message,
       upstreamStatus: null,
     };
@@ -116,7 +126,7 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
         failureClass: "rate_limited",
         retryable: true,
         status: 503,
-        publicMessage: "Live train data is busy right now. Please try again shortly.",
+        publicMessage: "Train running data is busy right now. Please try again shortly.",
         technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
         upstreamStatus: error.status,
       };
@@ -127,7 +137,7 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
         failureClass: "provider_unavailable",
         retryable: true,
         status: 503,
-        publicMessage: "Live train data is unavailable right now. Please try again.",
+        publicMessage: "Train running data is unavailable right now. Please try again.",
         technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
         upstreamStatus: error.status,
       };
@@ -137,7 +147,7 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
       failureClass: "provider_rejected_request",
       retryable: false,
       status: 502,
-      publicMessage: "We couldn't load live train data for this search right now.",
+      publicMessage: "We couldn't load train running data for this search right now.",
       technicalMessage: `${error.message} ${error.bodyPreview}`.trim(),
       upstreamStatus: error.status,
     };
@@ -147,7 +157,7 @@ function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
     failureClass: "unexpected",
     retryable: true,
     status: 503,
-    publicMessage: "We couldn't load live train data right now. Please try again.",
+    publicMessage: "We couldn't load train running data right now. Please try again.",
     technicalMessage: error instanceof Error ? error.message : "Unknown Darwin provider error",
     upstreamStatus: null,
   };
@@ -196,6 +206,49 @@ async function getLiveBoardJourneys(query: JourneyProviderQuery): Promise<Journe
   }
 }
 
+async function getHistoricalHspJourneys(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
+  try {
+    return await fetchHspJourneys({
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      time: query.time,
+      windowMins: query.windowMins,
+    });
+  } catch (err) {
+    const failure = classifyDarwinFailure(err);
+
+    void emitProductSignal("darwin_api_error", {
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      time: query.time,
+      window_mins: query.windowMins,
+      provider: "darwin.hsp",
+      failure_class: failure.failureClass,
+      retryable: failure.retryable,
+      endpoint_context: "journey_search",
+      journey_stage: "journey_lookup_failed",
+      user_outcome: "historical_results_unavailable",
+      upstream_status: failure.upstreamStatus,
+      technical_message: failure.technicalMessage,
+    });
+
+    console.error("[journeys-provider] historical HSP lookup failed", {
+      from: query.from,
+      to: query.to,
+      date: query.date,
+      time: query.time,
+      failureClass: failure.failureClass,
+      retryable: failure.retryable,
+      upstreamStatus: failure.upstreamStatus,
+      technicalMessage: failure.technicalMessage,
+    });
+
+    throw new JourneyProviderError(failure);
+  }
+}
+
 export async function getJourneysFromProvider(query: JourneyProviderQuery): Promise<JourneyProviderResult> {
   if (!parseISODate(query.date)) {
     throw new JourneyProviderError({
@@ -220,6 +273,8 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
   }
 
   const darwinMode = (process.env.DARWIN_MODE ?? "fixture").trim().toLowerCase();
+  const useHspForHistorical = process.env.USE_HSP === "1";
+  const shouldUseHistoricalHsp = darwinMode === "live" && useHspForHistorical && isHistoricalSearch(query.date);
   let result: JourneyProviderResult;
 
   if (darwinMode === "fixture") {
@@ -230,6 +285,8 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
       time: normalizedTime,
       windowMins: query.windowMins,
     });
+  } else if (shouldUseHistoricalHsp) {
+    result = await getHistoricalHspJourneys({ ...query, time: normalizedTime });
   } else if (darwinMode === "live") {
     result = await getLiveBoardJourneys({ ...query, time: normalizedTime });
   } else if (darwinMode === "off") {

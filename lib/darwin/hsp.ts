@@ -1,5 +1,7 @@
-import { buildBasicAuthHeader, postJson } from "@/lib/darwin/client";
+import { postJson } from "@/lib/darwin/client";
+import { rankServicesForJourney } from "@/lib/darwin/match";
 import type {
+  DarwinMatchingDiagnostics,
   DarwinNormalizedService,
   HspDayType,
   HspServiceMetricsRequest,
@@ -32,12 +34,35 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null;
 }
 
-function pickString(obj: Record<string, unknown>, keys: string[]) {
-  for (const key of keys) {
-    const value = obj[key];
-    if (typeof value === "string" && value.trim().length > 0) return value.trim();
+function normalizeKey(key: string) {
+  return key.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function findValue(obj: Record<string, unknown>, keys: string[]) {
+  const wanted = new Set(keys.map(normalizeKey));
+  for (const [key, value] of Object.entries(obj)) {
+    if (wanted.has(normalizeKey(key))) {
+      return value;
+    }
   }
+  return undefined;
+}
+
+function pickString(obj: Record<string, unknown>, keys: string[]) {
+  const value = findValue(obj, keys);
+  if (typeof value === "string" && value.trim().length > 0) return value.trim();
   return null;
+}
+
+function pickRecord(obj: Record<string, unknown>, keys: string[]) {
+  const value = findValue(obj, keys);
+  return isRecord(value) ? value : null;
+}
+
+function pickRecordArray(obj: Record<string, unknown>, keys: string[]) {
+  const value = findValue(obj, keys);
+  if (!Array.isArray(value)) return null;
+  return value.filter(isRecord);
 }
 
 function parseISODate(dateStr: string) {
@@ -81,9 +106,11 @@ function toHHMM(v: unknown): string | null {
   const compact = /^(\d{2})(\d{2})$/.exec(text);
   if (compact) return `${compact[1]}:${compact[2]}`;
   const colon = /^(\d{1,2}):(\d{2})$/.exec(text);
-  if (!colon) return null;
-  const hh = Number(colon[1]);
-  const mm = Number(colon[2]);
+  const iso = /T(\d{1,2}):(\d{2})/.exec(text);
+  const match = colon ?? iso;
+  if (!match) return null;
+  const hh = Number(match[1]);
+  const mm = Number(match[2]);
   if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
@@ -101,8 +128,8 @@ function extractRid(serviceObj: Record<string, unknown>) {
 
 function toMetric(serviceLike: Record<string, unknown>): HspServiceMetric | null {
   const metricObject =
-    (Array.isArray(serviceLike.serviceAttributesMetrics) ? serviceLike.serviceAttributesMetrics[0] : null) ??
-    (isRecord(serviceLike.serviceAttributesMetrics) ? serviceLike.serviceAttributesMetrics : null) ??
+    pickRecordArray(serviceLike, ["serviceAttributesMetrics"])?.[0] ??
+    pickRecord(serviceLike, ["serviceAttributesMetrics"]) ??
     serviceLike;
   if (!isRecord(metricObject)) return null;
   const rid = extractRid(serviceLike) ?? extractRid(metricObject);
@@ -117,9 +144,7 @@ function toMetric(serviceLike: Record<string, unknown>): HspServiceMetric | null
 function extractMetrics(payload: unknown) {
   if (!isRecord(payload)) return [];
   const candidates =
-    (Array.isArray(payload.Services) ? payload.Services : null) ??
-    (Array.isArray(payload.services) ? payload.services : null) ??
-    (Array.isArray(payload.data) ? payload.data : null) ??
+    pickRecordArray(payload, ["Services", "services", "serviceMetrics", "data"]) ??
     [];
   return candidates
     .map((entry) => (isRecord(entry) ? toMetric(entry) : null))
@@ -129,13 +154,12 @@ function extractMetrics(payload: unknown) {
 function parseServiceDetailsPayload(payload: unknown): HspServiceDetails {
   const root = isRecord(payload) ? payload : {};
   const detailRoot =
-    (Array.isArray(root.Services) ? root.Services[0] : null) ??
-    (Array.isArray(root.services) ? root.services[0] : null) ??
-    (isRecord(root.serviceDetails) ? root.serviceDetails : null) ??
+    pickRecordArray(root, ["Services", "services", "serviceDetails"])?.[0] ??
+    pickRecord(root, ["serviceDetails"]) ??
     root;
   const detailObj = isRecord(detailRoot) ? detailRoot : {};
   return {
-    locations: Array.isArray(detailObj.locations) ? detailObj.locations.filter(isRecord) : [],
+    locations: pickRecordArray(detailObj, ["locations"]) ?? [],
     lateCancelReason: pickString(detailObj, ["late_canc_reason", "lateCancelReason"]),
   };
 }
@@ -146,28 +170,31 @@ function findLocationByCrs(locations: HspLocation[], crs: string) {
 }
 
 function getConfig() {
-  const username = process.env.HSP_USERNAME?.trim();
-  const password = process.env.HSP_PASSWORD?.trim();
-  const baseUrl = (process.env.HSP_BASE_URL?.trim() || "https://hsp-prod.rockshore.net").replace(/\/+$/, "");
-  if (!username || !password) {
-    throw new HspCredentialsError("HSP credentials are missing. Set HSP_USERNAME and HSP_PASSWORD.");
+  const apiKey = process.env.HSP_API_KEY?.trim();
+  const baseUrl =
+    (
+      process.env.HSP_BASE_URL?.trim() ||
+      "https://api1.raildata.org.uk/1010-historical-service-performance-_hsp_v1/api/v1"
+    ).replace(/\/+$/, "");
+  if (!apiKey) {
+    throw new HspCredentialsError("HSP credentials are missing. Set HSP_API_KEY.");
   }
-  return { username, password, baseUrl };
+  return { apiKey, baseUrl };
 }
 
 export async function serviceMetrics(query: HspServiceMetricsRequest) {
   const config = getConfig();
-  return postJson(`${config.baseUrl}/api/v1/serviceMetrics`, query, {
-    Authorization: buildBasicAuthHeader(config.username, config.password),
+  return postJson(`${config.baseUrl}/serviceMetrics`, query, {
+    "x-apikey": config.apiKey,
   });
 }
 
 export async function serviceDetails(rid: string) {
   const config = getConfig();
   return postJson(
-    `${config.baseUrl}/api/v1/serviceDetails`,
+    `${config.baseUrl}/serviceDetails`,
     { rid },
-    { Authorization: buildBasicAuthHeader(config.username, config.password) }
+    { "x-apikey": config.apiKey }
   );
 }
 
@@ -268,5 +295,129 @@ export async function fetchHspServices(params: HspServicesParams) {
       to_time: toTime,
       days: dayType,
     },
+  };
+}
+
+export async function fetchHspJourneys(params: HspServicesParams) {
+  const requestedTime = toHHMM(params.time);
+  if (!requestedTime) {
+    throw new Error(`Invalid requested time '${params.time}' for HSP.`);
+  }
+
+  const base = await fetchHspServices({ ...params, detailsLimit: 0 });
+  const preRanked = rankServicesForJourney(base.services, { time: requestedTime });
+  const detailsLimit = Math.min(Math.max(params.detailsLimit ?? 8, 0), Math.max(preRanked.services.length, 0));
+  const detailUidSet = new Set(preRanked.services.slice(0, detailsLimit).map((service) => service.uid));
+
+  const enriched = await Promise.all(
+    preRanked.services.map(async (service) => {
+      if (!detailUidSet.has(service.uid)) {
+        return service;
+      }
+
+      const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
+      if (!rid) {
+        return service;
+      }
+
+      try {
+        const detailsPayload = await serviceDetails(rid);
+        const details = parseServiceDetailsPayload(detailsPayload);
+        const toLoc = findLocationByCrs(details.locations, params.to);
+        const fromLoc = findLocationByCrs(details.locations, params.from);
+        const cancelled =
+          Boolean(details.lateCancelReason) ||
+          Boolean(toLoc && pickString(toLoc, ["late_canc_reason", "lateCancelReason"]));
+        const aimedArrival = toHHMM(toLoc ? pickString(toLoc, ["gbtt_pta"]) : null);
+        const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
+        const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
+        const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
+        const { delayMins, status } = deriveDelayAndStatus({
+          cancelled,
+          aimedArr: aimedArrival,
+          expectedArr: actualArrival,
+          aimedDep: aimedDeparture,
+          expectedDep: actualDeparture,
+        });
+
+        return {
+          ...service,
+          aimedDeparture: aimedDeparture ?? service.aimedDeparture,
+          expectedDeparture: actualDeparture,
+          aimedArrival: aimedArrival ?? "",
+          expectedArrival: actualArrival,
+          delayMins,
+          status,
+          callsAtTo: toLoc ? true : undefined,
+          rawStatusText: cancelled ? "Cancelled" : "Historical timing data",
+        };
+      } catch (error) {
+        if (process.env.NODE_ENV === "development") {
+          console.warn("[HSP] service details lookup failed", {
+            rid,
+            from: params.from,
+            to: params.to,
+            message: error instanceof Error ? error.message : "Unknown error",
+          });
+        }
+        return service;
+      }
+    })
+  );
+
+  const matched = rankServicesForJourney(enriched, { time: requestedTime });
+  const destinationConfirmedCount = enriched.filter((service) => service.callsAtTo === true).length;
+  const destinationMismatchCount = enriched.filter((service) => service.callsAtTo === false).length;
+  const destinationUnknownCount = enriched.filter((service) => service.callsAtTo == null).length;
+  const diagnostics: DarwinMatchingDiagnostics = {
+    requestedTime,
+    windowMins: params.windowMins,
+    rawServiceCount: base.rawCount,
+    normalizedServiceCount: base.services.length,
+    afterTimeWindowCount: base.services.length,
+    afterDestinationFilterCount: base.services.length - destinationMismatchCount,
+    candidateCount: base.services.length,
+    excludedMissingFilterTime: 0,
+    excludedOutsideWindow: 0,
+    destinationConfirmedCount,
+    destinationMismatchCount,
+    destinationUnknownCount,
+    normalizedServiceSample: enriched.slice(0, 3).map((service) => ({
+      uid: service.uid,
+      destinationName: service.destinationName,
+      aimedDeparture: service.aimedDeparture,
+      expectedDeparture: service.expectedDeparture,
+      callsAtTo: service.callsAtTo ?? null,
+    })),
+    sampleExclusions: [],
+  };
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[HSP] historical journey search", {
+      from: params.from,
+      to: params.to,
+      date: params.date,
+      requestedTime,
+      windowMins: params.windowMins,
+      rawServiceCount: base.rawCount,
+      normalizedServiceCount: enriched.length,
+      topCandidates: matched.services.slice(0, 3).map((service) => ({
+        uid: service.uid,
+        matchScore: service.matchScore ?? null,
+        aimedDeparture: service.aimedDeparture,
+        expectedDeparture: service.expectedDeparture,
+        aimedArrival: service.aimedArrival,
+        expectedArrival: service.expectedArrival,
+        status: service.status,
+      })),
+    });
+  }
+
+  return {
+    ...matched,
+    diagnostics,
+    source: "darwin.hsp",
+    note:
+      "Using Darwin HSP historical service performance data for a past-date search. Services are matched by route and ranked around the searched departure time.",
   };
 }

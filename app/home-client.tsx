@@ -107,6 +107,10 @@ export default function HomeClient() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryableError, setRetryableError] = useState(false);
+  const [resultMeta, setResultMeta] = useState<{ source: string | null; note: string | null }>({
+    source: null,
+    note: null,
+  });
   const [submittedState, setSubmittedState] = useState(submitted);
   const [queryView, setQueryView] = useState({
     fromName: fromUrl,
@@ -154,7 +158,13 @@ export default function HomeClient() {
       const raw = await res.text();
       const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
       const data = isJson
-        ? (JSON.parse(raw) as { services?: Service[]; source?: string; error?: string; retryable?: boolean })
+        ? (JSON.parse(raw) as {
+            services?: Service[];
+            source?: string;
+            note?: string;
+            error?: string;
+            retryable?: boolean;
+          })
         : null;
       if (!res.ok) {
         const msg =
@@ -164,17 +174,23 @@ export default function HomeClient() {
             : raw.slice(0, 200)) ??
           "Failed to fetch journeys.";
         setServices([]);
+        setResultMeta({ source: null, note: null });
         setRetryableError(Boolean(data?.retryable) || res.status >= 500);
         setError(msg);
         return;
       }
       if (!data || !Array.isArray(data.services)) {
         setServices([]);
+        setResultMeta({ source: null, note: null });
         setRetryableError(true);
         setError("API returned non-JSON response. Check /api/journeys in the browser.");
         return;
       }
       const providerSource = typeof data.source === "string" ? data.source : null;
+      setResultMeta({
+        source: providerSource,
+        note: typeof data.note === "string" ? data.note : null,
+      });
       setServices(
         data.services.map((service) => ({
           ...service,
@@ -193,6 +209,7 @@ export default function HomeClient() {
         });
       }
       setServices([]);
+      setResultMeta({ source: null, note: null });
       setRetryableError(true);
       setError("Network error while fetching journeys.");
     } finally {
@@ -342,6 +359,7 @@ export default function HomeClient() {
     setDate(todayISO());
     setTime(nowHHMM());
     setServices([]);
+    setResultMeta({ source: null, note: null });
     setSubmittedState(false);
     window.history.replaceState({}, "", `/`);
   }
@@ -563,6 +581,15 @@ export default function HomeClient() {
             {loading && (
               <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm text-zinc-300">
                 Loading journeys…
+              </div>
+            )}
+
+            {!loading && !error && resultMeta.note && (
+              <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-3 text-sm text-zinc-300">
+                <p>{resultMeta.note}</p>
+                {resultMeta.source && (
+                  <p className="mt-1 text-xs text-zinc-500">Source: {resultMeta.source}</p>
+                )}
               </div>
             )}
 

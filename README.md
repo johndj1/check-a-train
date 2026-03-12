@@ -23,6 +23,9 @@ Required env vars:
 DARWIN_MODE=live
 DARWIN_API_KEY=your_rail_data_gateway_api_key
 DARWIN_BASE_URL=https://your-rail-data-gateway-base-url
+USE_HSP=0
+HSP_API_KEY=your_rail_data_hsp_api_key
+HSP_BASE_URL=https://api1.raildata.org.uk/1010-historical-service-performance-_hsp_v1/api/v1
 ```
 
 You can start from [`.env.example`](/Users/danjohn/Projects/Code/check-a-train/.env.example). Keep secrets in `.env.local`, not in committed files.
@@ -38,6 +41,54 @@ curl "http://localhost:3000/api/journeys?from=SEV&to=LBG&date=2026-03-11&time=08
 ```
 
 Use a live CRS such as `SEV` and a near-now time window. The route returns normalized `services`, a `source` of `darwin.gateway`, and a `note` describing the live provider.
+
+## HSP Historical Search
+
+When `DARWIN_MODE=live` and `USE_HSP=1`, `/api/journeys` automatically uses Darwin HSP for past-date searches.
+
+- Current-day and future searches still use the live Darwin board path.
+- Past-date searches return the same journey response shape, with `source: "darwin.hsp"` and a historical-source note for the UI.
+- HSP is only used to support the existing delay-details outcome; it does not add journey-planning or analytics features.
+
+### Local Verification
+
+1. Set `DARWIN_MODE=live`, `USE_HSP=1`, `HSP_API_KEY`, and `HSP_BASE_URL` in `.env.local`.
+2. Run `npm run dev`.
+3. Call `/api/journeys` with a past date, for example:
+
+```bash
+curl "http://localhost:3000/api/journeys?from=SEV&to=LBG&date=2026-03-05&time=08:30&window=30"
+```
+
+Expected verification points:
+
+- The JSON response includes `source: "darwin.hsp"`.
+- `note` explains that historical HSP data was used.
+- Returned `services` use the existing service card shape where data is available, including planned departure and, for enriched rows, actual arrival/departure timing.
+
+### Request Contract Used In App
+
+The app posts JSON to the Rail Data HSP gateway using:
+
+- Path: `POST {HSP_BASE_URL}/serviceMetrics`
+- Headers:
+  - `Content-Type: application/json`
+  - `x-apikey: {HSP_API_KEY}`
+- Payload shape:
+
+```json
+{
+  "from_loc": "SEV",
+  "to_loc": "LBG",
+  "from_date": "2026-03-05",
+  "to_date": "2026-03-05",
+  "from_time": "0800",
+  "to_time": "0900",
+  "days": "WEEKDAY"
+}
+```
+
+`days` is derived from the search date with a small explicit mapping: weekdays use `WEEKDAY`, Saturdays use `SATURDAY`, and Sundays use `SUNDAY`.
 
 ## Delay Repay Operator Routing
 
