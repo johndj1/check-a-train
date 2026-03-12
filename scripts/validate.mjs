@@ -543,6 +543,50 @@ function assertHspHelpersRegression() {
   }
 }
 
+function assertDelayRepayOperatorHandoffRegression() {
+  const operatorsSource = readFileSync("lib/operators.ts", "utf8");
+  const serviceCardSource = readFileSync("components/ServiceCard.tsx", "utf8");
+  const claimRouteSource = readFileSync("app/api/claim/start/route.ts", "utf8");
+
+  const requiredOperators = [
+    ['SE', "https://www.southeasternrailway.co.uk/delay-repay"],
+    ['TL', "https://www.thameslinkrailway.com/help-and-support/delay-repay"],
+    ['SN', "https://www.southernrailway.com/help-and-support/delay-repay"],
+    ['GN', "https://www.greatnorthernrail.com/help-and-support/delay-repay"],
+    ['GR', "https://www.lner.co.uk/support/refunds-and-compensation/delay-repay/"],
+  ];
+
+  for (const [code, url] of requiredOperators) {
+    if (!operatorsSource.includes(`code: "${code}"`) || !operatorsSource.includes(`delayRepayUrl: "${url}"`)) {
+      throw new Error(`Operator handoff regression: missing mapped claim page for ${code}.`);
+    }
+  }
+
+  if (!operatorsSource.includes("export function resolveDelayRepayClaimUrl(service: DelayRepayServiceOperatorInput)")) {
+    throw new Error("Operator handoff regression: operators module must expose a claim URL resolver helper.");
+  }
+
+  if (!serviceCardSource.includes("resolveDelayRepayOperator(service)")) {
+    throw new Error("Operator handoff regression: ServiceCard must resolve operators via the shared helper.");
+  }
+
+  if (!serviceCardSource.includes("operatorName,")) {
+    throw new Error("Operator handoff regression: ServiceCard must pass operatorName into claim handoff params.");
+  }
+
+  if (!serviceCardSource.includes("Claim link unavailable")) {
+    throw new Error("Operator handoff regression: eligible unmapped services must show a claim link unavailable fallback.");
+  }
+
+  if (!claimRouteSource.includes('const operatorName = searchParams.get("operatorName")?.trim() ?? "";')) {
+    throw new Error("Operator handoff regression: claim route must accept operatorName for fallback lookup.");
+  }
+
+  if (!claimRouteSource.includes("getOperator(operatorCode, operatorName)")) {
+    throw new Error("Operator handoff regression: claim route must resolve operators by code with name fallback.");
+  }
+}
+
 const checks = [
   ["npm", ["run", "lint"]],
   ["npx", ["tsc", "--noEmit"]],
@@ -568,6 +612,7 @@ assertDelayCalculationRegression();
 assertDelayAndStatusDerivationRegression();
 assertDarwinFixtureRegression();
 assertHspHelpersRegression();
+assertDelayRepayOperatorHandoffRegression();
 
 for (const [cmd, args] of checks) {
   const code = await run(cmd, args);

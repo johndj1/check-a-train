@@ -6,6 +6,7 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
 
   const operatorCode = searchParams.get("operator")?.trim() ?? "";
+  const operatorName = searchParams.get("operatorName")?.trim() ?? "";
   const serviceUid = searchParams.get("serviceUid")?.trim() ?? "";
   const originName = searchParams.get("originName")?.trim() ?? "";
   const destinationName = searchParams.get("destinationName")?.trim() ?? "";
@@ -13,7 +14,7 @@ export async function GET(request: Request) {
   const delayMinsRaw = searchParams.get("delayMins")?.trim() ?? "";
   const providerSource = searchParams.get("providerSource")?.trim() ?? "";
 
-  const operator = getOperator(operatorCode);
+  const operator = getOperator(operatorCode, operatorName);
   if (!operator) {
     return NextResponse.json({ error: "Unknown operator." }, { status: 400 });
   }

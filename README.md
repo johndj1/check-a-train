@@ -39,6 +39,14 @@ curl "http://localhost:3000/api/journeys?from=SEV&to=LBG&date=2026-03-11&time=08
 
 Use a live CRS such as `SEV` and a near-now time window. The route returns normalized `services`, a `source` of `darwin.gateway`, and a `note` describing the live provider.
 
+## Delay Repay Operator Routing
+
+Delay Repay claim routing is driven by the explicit mapping in [lib/operators.ts](/Users/danjohn/Projects/Code/check-a-train/lib/operators.ts).
+
+- The helper resolves by normalized operator code first, then falls back to operator name and aliases.
+- The current starter set includes Southeastern (`SE`), Thameslink (`TL`), Southern (`SN`), Gatwick Express (`GX`), Great Northern (`GN`), and South Western Railway (`SW`).
+- If a service is eligible but no mapped operator claim URL exists yet, the UI shows `Claim link unavailable` instead of sending the user to the wrong place.
+
 ## Journey Matching And First-Pass Delay
 
 `/api/journeys` now does two small extra steps after Darwin normalization:

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Service } from "@/hooks/useJourneySearch";
-import { getOperator } from "@/lib/operators";
+import { resolveDelayRepayOperator } from "@/lib/operators";
 
 type ServiceCardProps = {
   service: Partial<Service> | null | undefined;
@@ -69,7 +69,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       : "Unknown";
   const delayMins =
     status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
-  const operator = getOperator(service.operator);
+  const operator = resolveDelayRepayOperator(service);
   const providerSource = typeof service.providerSource === "string" ? service.providerSource : "";
   const isEligible = service.isEligible === true;
   const eligibilityReason =
@@ -82,6 +82,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const claimHref = operator && isEligible
     ? `/api/claim/start?${new URLSearchParams({
         operator: operator.code,
+        operatorName,
         serviceUid: uid,
         originName,
         destinationName,
@@ -90,6 +91,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         providerSource,
       }).toString()}`
     : null;
+  const showClaimUnavailable = isEligible && !claimHref;
 
   const claimPack = [
     `Service UID: ${uid}`,
@@ -160,6 +162,18 @@ export default function ServiceCard({ service }: ServiceCardProps) {
             </a>
           )}
 
+          {showClaimUnavailable && (
+            <button
+              type="button"
+              disabled
+              aria-disabled="true"
+              title="Claim link unavailable for this operator"
+              className="cursor-not-allowed rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-500"
+            >
+              Claim link unavailable
+            </button>
+          )}
+
           <button
             type="button"
             onClick={onCopyDetails}
@@ -181,6 +195,11 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       </div>
 
       {copyMessage && <p className="mt-2 text-xs text-zinc-400">{copyMessage}</p>}
+      {showClaimUnavailable && (
+        <p className="mt-2 text-xs text-zinc-500">
+          This service looks eligible, but no operator claim link is mapped yet.
+        </p>
+      )}
 
       <div
         id={`service-details-${uid}`}
