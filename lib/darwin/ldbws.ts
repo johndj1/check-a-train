@@ -314,6 +314,7 @@ function normalizeService(service: UnknownRecord, params: DarwinBoardParams, ind
     uid: `DARWIN:${serviceId ?? `${params.from.toUpperCase()}-${index}`}`,
     operator: pickString(service, OPERATOR_CODE_KEYS),
     operatorName: pickString(service, OPERATOR_NAME_KEYS) ?? "Unknown",
+    claimUrl: null,
     platform: pickString(service, PLATFORM_KEYS),
     originName: extractLocationName(originNode) ?? params.from.toUpperCase(),
     destinationName: extractLocationName(destinationNode) ?? params.to.toUpperCase(),

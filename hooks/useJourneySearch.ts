@@ -4,6 +4,7 @@ export type Service = {
   uid: string;
   operator: string | null;
   operatorName: string;
+  claimUrl: string | null;
   platform: string | null;
   providerSource?: string | null;
 

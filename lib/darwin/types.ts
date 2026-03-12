@@ -45,6 +45,7 @@ export type DarwinNormalizedService = {
   uid: string;
   operator: string | null;
   operatorName: string;
+  claimUrl: string | null;
   platform: string | null;
   originName: string;
   destinationName: string;

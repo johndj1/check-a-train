@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import type { Service } from "@/hooks/useJourneySearch";
-import { resolveDelayRepayOperator } from "@/lib/operators";
 
 type ServiceCardProps = {
   service: Partial<Service> | null | undefined;
@@ -114,8 +113,9 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       : "Unknown";
   const delayMins =
     status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
-  const operator = resolveDelayRepayOperator(service);
   const providerSource = typeof service.providerSource === "string" ? service.providerSource : "";
+  const claimUrl =
+    typeof service.claimUrl === "string" && service.claimUrl.trim().length > 0 ? service.claimUrl : null;
   const isEligible = service.isEligible === true;
   const eligibilityReason =
     typeof service.eligibilityReason === "string" && service.eligibilityReason.trim().length > 0
@@ -143,19 +143,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
   const destinationStop = destinationStopCopy(callsAtTo);
 
   const arrival = expectedArrival ?? (aimedArrival || "—");
-  const claimHref = operator && isEligible
-    ? `/api/claim/start?${new URLSearchParams({
-        operator: operator.code,
-        operatorName,
-        serviceUid: uid,
-        originName,
-        destinationName,
-        status,
-        delayMins: delayMins === null ? "" : String(delayMins),
-        providerSource,
-      }).toString()}`
-    : null;
-  const showClaimUnavailable = isEligible && !claimHref;
+  const shouldShowClaimCta = (isEligible || status === "Cancelled") && claimUrl;
 
   const claimPack = [
     `Service UID: ${uid}`,
@@ -220,25 +208,15 @@ export default function ServiceCard({ service }: ServiceCardProps) {
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
-          {claimHref && (
+          {shouldShowClaimCta && (
             <a
-              href={claimHref}
+              href={claimUrl}
+              target="_blank"
+              rel="noreferrer"
               className="rounded-xl bg-amber-300 px-3 py-2 text-xs font-semibold text-zinc-950 hover:bg-amber-200"
             >
-              Claim Delay Repay
+              Claim Delay Repay from {operatorName}
             </a>
-          )}
-
-          {showClaimUnavailable && (
-            <button
-              type="button"
-              disabled
-              aria-disabled="true"
-              title="Claim link unavailable for this operator"
-              className="cursor-not-allowed rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-500"
-            >
-              Claim link unavailable
-            </button>
           )}
 
           <button
@@ -262,11 +240,6 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       </div>
 
       {copyMessage && <p className="mt-2 text-xs text-zinc-400">{copyMessage}</p>}
-      {showClaimUnavailable && (
-        <p className="mt-2 text-xs text-zinc-500">
-          This service looks eligible, but no operator claim link is mapped yet.
-        </p>
-      )}
 
       <div
         id={`service-details-${uid}`}

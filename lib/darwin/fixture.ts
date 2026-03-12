@@ -72,6 +72,7 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
       uid: `DARWIN:${service.rid || idx}`,
       operator: service.operator ?? null,
       operatorName: service.operator ?? "Unknown",
+      claimUrl: null,
       platform: service.platform,
       originName: query.from.toUpperCase(),
       destinationName: query.to.toUpperCase(),

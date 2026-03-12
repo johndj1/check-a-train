@@ -460,6 +460,7 @@ export async function fetchHspServices(params: HspServicesParams) {
     uid: `HSP:${metric.rid}`,
     operator: metric.tocCode,
     operatorName: metric.tocCode ?? "Unknown",
+    claimUrl: null,
     platform: null,
     originName: params.from.toUpperCase(),
     destinationName: params.to.toUpperCase(),

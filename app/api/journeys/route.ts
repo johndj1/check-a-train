@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getJourneysFromProvider, JourneyProviderError } from "@/lib/providers/journeys-provider";
 import { deriveDelayRepayEligibility } from "@/lib/delay-repay/eligibility";
+import { resolveOperatorClaimUrl } from "@/lib/operators/claim-links";
 import { emitProductSignal, isRealUsageSignalContext } from "@/lib/productos-signal";
 
 function toHHMM(v: unknown): string | null {
@@ -75,9 +76,11 @@ export async function GET(req: Request) {
       const eligibility = deriveDelayRepayEligibility({
         delayMins: service.delayMins,
       });
+      const claimUrl = resolveOperatorClaimUrl(service.operator, service.operatorName);
 
       return {
         ...service,
+        claimUrl,
         isEligible: eligibility.isEligible,
         eligibilityReason: eligibility.eligibilityReason,
         eligibilityBand: eligibility.eligibilityBand,
