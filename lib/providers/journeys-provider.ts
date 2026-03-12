@@ -3,6 +3,7 @@ import { DarwinHttpError, DarwinTimeoutError } from "@/lib/darwin/client";
 import { DarwinCredentialsError, fetchDarwinDepartureBoard } from "@/lib/darwin/ldbws";
 import { fetchHspJourneys, HspCredentialsError } from "@/lib/darwin/hsp";
 import { emitProductSignal } from "@/lib/productos-signal";
+import { hhmmToMins } from "@/lib/time/hhmm";
 import type {
   DarwinFirstPassStatus,
   DarwinMatchingDiagnostics,
@@ -43,6 +44,8 @@ type JourneyProviderFailure = {
   technicalMessage: string;
   upstreamStatus: number | null;
 };
+
+const SAME_DAY_HSP_BUFFER_MINS = 45;
 
 export class JourneyProviderError extends Error {
   status: number;
@@ -88,13 +91,42 @@ function toHHMM(v: unknown): string | null {
   return `${String(hh).padStart(2, "0")}:${String(mm).padStart(2, "0")}`;
 }
 
-function isHistoricalSearch(dateStr: string) {
+function historicalSelectionReason(dateStr: string, timeStr: string, now = new Date()) {
   const queryDate = parseISODate(dateStr);
-  if (!queryDate) return false;
+  const queryTimeMins = hhmmToMins(timeStr);
+  if (!queryDate || queryTimeMins == null) {
+    return {
+      useHistoricalHsp: false,
+      reason: "invalid_query_time_or_date",
+    };
+  }
 
-  const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  return queryDate.getTime() < today.getTime();
+  if (queryDate.getTime() < today.getTime()) {
+    return {
+      useHistoricalHsp: true,
+      reason: "date_before_today",
+    };
+  }
+  if (queryDate.getTime() > today.getTime()) {
+    return {
+      useHistoricalHsp: false,
+      reason: "date_after_today",
+    };
+  }
+
+  const nowTimeMins = now.getHours() * 60 + now.getMinutes();
+  if (queryTimeMins <= nowTimeMins - SAME_DAY_HSP_BUFFER_MINS) {
+    return {
+      useHistoricalHsp: true,
+      reason: "same_day_time_outside_live_buffer",
+    };
+  }
+
+  return {
+    useHistoricalHsp: false,
+    reason: "same_day_time_within_live_buffer",
+  };
 }
 
 function classifyDarwinFailure(error: unknown): JourneyProviderFailure {
@@ -274,7 +306,9 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
 
   const darwinMode = (process.env.DARWIN_MODE ?? "fixture").trim().toLowerCase();
   const useHspForHistorical = process.env.USE_HSP === "1";
-  const shouldUseHistoricalHsp = darwinMode === "live" && useHspForHistorical && isHistoricalSearch(query.date);
+  const historicalDecision = historicalSelectionReason(query.date, normalizedTime);
+  const shouldUseHistoricalHsp =
+    darwinMode === "live" && useHspForHistorical && historicalDecision.useHistoricalHsp;
   let result: JourneyProviderResult;
 
   if (darwinMode === "fixture") {
@@ -311,10 +345,14 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
   }
 
   if (process.env.NODE_ENV === "development") {
-    console.log("journeys provider", {
+    console.log("[journeys-provider] source selected", {
       chosenSource: result.source,
+      darwinMode,
+      useHspForHistorical,
       date: query.date,
       requestedTime: normalizedTime,
+      sameDayHspBufferMins: SAME_DAY_HSP_BUFFER_MINS,
+      providerSelectionReason: historicalDecision.reason,
       windowMins: query.windowMins,
       afterCount: result.services.length,
       selectedServiceUid: result.selectedService?.uid ?? null,

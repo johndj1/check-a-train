@@ -56,6 +56,46 @@ function hspDayType(dateStr) {
   return "WEEKDAY";
 }
 
+const SAME_DAY_HSP_BUFFER_MINS = 45;
+
+function historicalSelectionReason(dateStr, timeStr, now = new Date()) {
+  const queryDate = parseISODate(dateStr);
+  const queryTimeMins = hhmmToMins(timeStr);
+  if (!queryDate || queryTimeMins == null) {
+    return {
+      useHistoricalHsp: false,
+      reason: "invalid_query_time_or_date",
+    };
+  }
+
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (queryDate.getTime() < today.getTime()) {
+    return {
+      useHistoricalHsp: true,
+      reason: "date_before_today",
+    };
+  }
+  if (queryDate.getTime() > today.getTime()) {
+    return {
+      useHistoricalHsp: false,
+      reason: "date_after_today",
+    };
+  }
+
+  const nowTimeMins = now.getHours() * 60 + now.getMinutes();
+  if (queryTimeMins <= nowTimeMins - SAME_DAY_HSP_BUFFER_MINS) {
+    return {
+      useHistoricalHsp: true,
+      reason: "same_day_time_outside_live_buffer",
+    };
+  }
+
+  return {
+    useHistoricalHsp: false,
+    reason: "same_day_time_within_live_buffer",
+  };
+}
+
 function minsToCompactHHMM(totalMins) {
   const clamped = Math.min(Math.max(Math.floor(totalMins), 0), 1439);
   const hh = String(Math.floor(clamped / 60)).padStart(2, "0");
@@ -543,6 +583,39 @@ function assertHspHelpersRegression() {
   }
 }
 
+function assertHistoricalProviderSelectionRegression() {
+  const fixedNow = new Date("2026-03-12T14:30:00");
+
+  if (!historicalSelectionReason("2026-03-11", "08:30", fixedNow).useHistoricalHsp) {
+    throw new Error("Provider selection regression: past dates must stay historical.");
+  }
+
+  if (!historicalSelectionReason("2026-03-12", "09:00", fixedNow).useHistoricalHsp) {
+    throw new Error("Provider selection regression: same-day past departures must use historical search.");
+  }
+
+  if (historicalSelectionReason("2026-03-12", "14:00", fixedNow).useHistoricalHsp) {
+    throw new Error("Provider selection regression: same-day departures inside the live buffer must stay live.");
+  }
+
+  if (historicalSelectionReason("2026-03-12", "15:00", fixedNow).useHistoricalHsp) {
+    throw new Error("Provider selection regression: same-day future departures must stay live.");
+  }
+
+  if (historicalSelectionReason("2026-03-13", "09:00", fixedNow).useHistoricalHsp) {
+    throw new Error("Provider selection regression: future dates must stay live.");
+  }
+
+  const providerSource = readFileSync("lib/providers/journeys-provider.ts", "utf8");
+  if (!providerSource.includes("historicalSelectionReason(query.date, normalizedTime)")) {
+    throw new Error("Provider selection regression: provider must classify same-day searches with date and time.");
+  }
+
+  if (!providerSource.includes("SAME_DAY_HSP_BUFFER_MINS = 45")) {
+    throw new Error("Provider selection regression: provider must keep an explicit same-day buffer.");
+  }
+}
+
 function assertDelayRepayOperatorHandoffRegression() {
   const operatorsSource = readFileSync("lib/operators.ts", "utf8");
   const serviceCardSource = readFileSync("components/ServiceCard.tsx", "utf8");
@@ -612,6 +685,7 @@ assertDelayCalculationRegression();
 assertDelayAndStatusDerivationRegression();
 assertDarwinFixtureRegression();
 assertHspHelpersRegression();
+assertHistoricalProviderSelectionRegression();
 assertDelayRepayOperatorHandoffRegression();
 
 for (const [cmd, args] of checks) {

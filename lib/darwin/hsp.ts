@@ -36,12 +36,19 @@ type HspServiceDetailSummary = {
 
 const HSP_SERVICE_DETAILS_TIMEOUT_MS = 12000;
 const HSP_MVP_DETAILS_LIMIT = 1;
+const HSP_DEBUG_TIMING_ENABLED =
+  process.env.HSP_DEBUG_TIMING === "1" || process.env.NODE_ENV === "development";
 
 export class HspCredentialsError extends Error {
   constructor(message = "Missing HSP credentials.") {
     super(message);
     this.name = "HspCredentialsError";
   }
+}
+
+function hspDebugLog(event: string, payload: Record<string, unknown>) {
+  if (!HSP_DEBUG_TIMING_ENABLED) return;
+  console.info(`[HSP] ${event}`, payload);
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -284,9 +291,36 @@ function getConfig() {
 
 export async function serviceMetrics(query: HspServiceMetricsRequest) {
   const config = getConfig();
-  return postJson(`${config.baseUrl}/serviceMetrics`, query, {
-    "x-apikey": config.apiKey,
-  });
+  const startedAt = Date.now();
+  try {
+    const payload = await postJson(`${config.baseUrl}/serviceMetrics`, query, {
+      "x-apikey": config.apiKey,
+    });
+    hspDebugLog("serviceMetrics response", {
+      durationMs: Date.now() - startedAt,
+      from: query.from_loc,
+      to: query.to_loc,
+      fromDate: query.from_date,
+      toDate: query.to_date,
+      fromTime: query.from_time,
+      toTime: query.to_time,
+      days: query.days,
+    });
+    return payload;
+  } catch (error) {
+    hspDebugLog("serviceMetrics failed", {
+      durationMs: Date.now() - startedAt,
+      from: query.from_loc,
+      to: query.to_loc,
+      fromDate: query.from_date,
+      toDate: query.to_date,
+      fromTime: query.from_time,
+      toTime: query.to_time,
+      days: query.days,
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+    throw error;
+  }
 }
 
 export async function serviceDetails(rid: string, timeoutMs?: number) {
@@ -309,15 +343,14 @@ async function loadHspServiceDetailSummary(
   params: Pick<HspServicesParams, "from" | "to">,
   timeoutMs = HSP_SERVICE_DETAILS_TIMEOUT_MS,
 ): Promise<HspServiceDetailSummary> {
-  if (process.env.NODE_ENV === "development") {
-    console.info("[HSP] serviceDetails requested", {
-      rid,
-      from: params.from,
-      to: params.to,
-      timeoutMs,
-    });
-  }
+  hspDebugLog("serviceDetails requested", {
+    rid,
+    from: params.from,
+    to: params.to,
+    timeoutMs,
+  });
 
+  const startedAt = Date.now();
   const detailsPayload = await serviceDetails(rid, timeoutMs);
   const details = parseServiceDetailsPayload(detailsPayload);
   const toLoc = findLocationByCrs(details.locations, params.to);
@@ -337,20 +370,20 @@ async function loadHspServiceDetailSummary(
     expectedDep: actualDeparture,
   });
 
-  if (process.env.NODE_ENV === "development") {
-    console.info("[HSP] serviceDetails succeeded", {
-      rid,
-      from: params.from,
-      to: params.to,
-      callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
-      aimedDeparture,
-      actualDeparture,
-      aimedArrival,
-      actualArrival,
-      status,
-      delayMins,
-    });
-  }
+  hspDebugLog("serviceDetails succeeded", {
+    rid,
+    from: params.from,
+    to: params.to,
+    durationMs: Date.now() - startedAt,
+    locationCount: details.locations.length,
+    callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
+    aimedDeparture,
+    actualDeparture,
+    aimedArrival,
+    actualArrival,
+    status,
+    delayMins,
+  });
 
   return {
     aimedDeparture,
@@ -435,6 +468,19 @@ export async function fetchHspServices(params: HspServicesParams) {
   const fromTime = minsToCompactHHMM(requestedMins - params.windowMins);
   const toTime = minsToCompactHHMM(requestedMins + params.windowMins);
   const dayType = deriveDayType(params.date);
+  const startedAt = Date.now();
+
+  hspDebugLog("fetchHspServices started", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime: params.time,
+    windowMins: params.windowMins,
+    fromTime,
+    toTime,
+    dayType,
+    detailsLimit: params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT,
+  });
 
   const metricsPayload = await serviceMetrics({
     from_loc: params.from.toUpperCase(),
@@ -447,15 +493,13 @@ export async function fetchHspServices(params: HspServicesParams) {
   });
 
   const metrics = extractMetrics(metricsPayload);
-  if (process.env.NODE_ENV === "development") {
-    console.info("[HSP] serviceMetrics succeeded", {
-      from: params.from,
-      to: params.to,
-      date: params.date,
-      requestedTime: params.time,
-      rawServiceCount: metrics.length,
-    });
-  }
+  hspDebugLog("serviceMetrics parsed", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime: params.time,
+    rawServiceCount: metrics.length,
+  });
   const baseServices: DarwinNormalizedService[] = metrics.map((metric, idx) => ({
     uid: `HSP:${metric.rid}`,
     operator: metric.tocCode,
@@ -476,7 +520,27 @@ export async function fetchHspServices(params: HspServicesParams) {
 
   const detailsLimit = clampPositiveInt(params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT, 0, HSP_MVP_DETAILS_LIMIT);
   const detailUidSet = new Set(baseServices.slice(0, detailsLimit).map((service) => service.uid));
+  hspDebugLog("fetchHspServices enrichment plan", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime: params.time,
+    baseServiceCount: baseServices.length,
+    detailsLimit,
+    enrichmentRidCount: detailUidSet.size,
+  });
   const services = await enrichSelectedHspServices(baseServices, params, detailUidSet);
+
+  hspDebugLog("fetchHspServices completed", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime: params.time,
+    durationMs: Date.now() - startedAt,
+    rawServiceCount: metrics.length,
+    enrichedServiceCount: services.length,
+    detailsAttempted: detailUidSet.size,
+  });
 
   return {
     services,
@@ -494,6 +558,15 @@ export async function fetchHspJourneys(params: HspServicesParams) {
   if (!requestedTime) {
     throw new Error(`Invalid requested time '${params.time}' for HSP.`);
   }
+
+  const startedAt = Date.now();
+  hspDebugLog("historical journey search started", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime,
+    windowMins: params.windowMins,
+  });
 
   const base = await fetchHspServices({ ...params, detailsLimit: 0 });
   const preRanked = rankServicesForJourney(base.services, { time: requestedTime });
@@ -532,26 +605,27 @@ export async function fetchHspJourneys(params: HspServicesParams) {
     sampleExclusions: [],
   };
 
-  if (process.env.NODE_ENV === "development") {
-    console.log("[HSP] historical journey search", {
-      from: params.from,
-      to: params.to,
-      date: params.date,
-      requestedTime,
-      windowMins: params.windowMins,
-      rawServiceCount: base.rawCount,
-      normalizedServiceCount: enriched.length,
-      topCandidates: matched.services.slice(0, 3).map((service) => ({
-        uid: service.uid,
-        matchScore: service.matchScore ?? null,
-        aimedDeparture: service.aimedDeparture,
-        expectedDeparture: service.expectedDeparture,
-        aimedArrival: service.aimedArrival,
-        expectedArrival: service.expectedArrival,
-        status: service.status,
-      })),
-    });
-  }
+  hspDebugLog("historical journey search completed", {
+    from: params.from,
+    to: params.to,
+    date: params.date,
+    requestedTime,
+    windowMins: params.windowMins,
+    durationMs: Date.now() - startedAt,
+    rawServiceCount: base.rawCount,
+    normalizedServiceCount: enriched.length,
+    detailsLimit,
+    detailsAttempted: detailUidSet.size,
+    topCandidates: matched.services.slice(0, 3).map((service) => ({
+      uid: service.uid,
+      matchScore: service.matchScore ?? null,
+      aimedDeparture: service.aimedDeparture,
+      expectedDeparture: service.expectedDeparture,
+      aimedArrival: service.aimedArrival,
+      expectedArrival: service.expectedArrival,
+      status: service.status,
+    })),
+  });
 
   return {
     ...matched,
