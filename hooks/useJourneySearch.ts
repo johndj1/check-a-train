@@ -18,6 +18,9 @@ export type Service = {
 
   status: "On time" | "Delayed" | "Cancelled" | "Unknown";
   callsAtTo?: boolean;
+  isEligible?: boolean;
+  eligibilityReason?: string;
+  eligibilityBand?: "eligible" | "below_threshold" | "unknown_delay";
 };
 
 type JourneyQuery = {

@@ -21,6 +21,29 @@ function statusClass(status: Service["status"]) {
   return "text-red-300";
 }
 
+function eligibilityCopy(service: Partial<Service>) {
+  const band = service.eligibilityBand ?? "unknown_delay";
+
+  if (band === "eligible") {
+    return {
+      label: "Eligible",
+      className: "border-emerald-700/60 bg-emerald-950/40 text-emerald-200",
+    };
+  }
+
+  if (band === "below_threshold") {
+    return {
+      label: "Not eligible",
+      className: "border-zinc-700 bg-zinc-900 text-zinc-300",
+    };
+  }
+
+  return {
+    label: "Eligibility unknown",
+    className: "border-zinc-700 bg-zinc-900 text-zinc-400",
+  };
+}
+
 export default function ServiceCard({ service }: ServiceCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
@@ -48,9 +71,15 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     status !== "Cancelled" && typeof service.delayMins === "number" ? service.delayMins : null;
   const operator = getOperator(service.operator);
   const providerSource = typeof service.providerSource === "string" ? service.providerSource : "";
+  const isEligible = service.isEligible === true;
+  const eligibilityReason =
+    typeof service.eligibilityReason === "string" && service.eligibilityReason.trim().length > 0
+      ? service.eligibilityReason
+      : "Not eligible yet";
+  const eligibility = eligibilityCopy(service);
 
   const arrival = expectedArrival ?? (aimedArrival || "—");
-  const claimHref = operator
+  const claimHref = operator && isEligible
     ? `/api/claim/start?${new URLSearchParams({
         operator: operator.code,
         serviceUid: uid,
@@ -73,6 +102,8 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     `Aimed arrival: ${aimedArrival || "Unknown"}`,
     `Expected arrival: ${expectedArrival ?? "Unknown"}`,
     `Delay: ${formatDelay(delayMins)}`,
+    `Eligibility: ${eligibility.label}`,
+    `Eligibility reason: ${eligibilityReason}`,
     `Calls at destination: ${callsAtTo == null ? "Unknown" : callsAtTo ? "Yes" : "No"}`,
     `Provider source: ${providerSource || "Unknown"}`,
   ].join("\n");
@@ -107,7 +138,16 @@ export default function ServiceCard({ service }: ServiceCardProps) {
               <span className="text-zinc-400">Delay:</span>{" "}
               <span className="font-medium text-zinc-200">{formatDelay(delayMins)}</span>
             </div>
+            <div
+              className={[
+                "rounded-full border px-2 py-0.5 text-xs font-medium",
+                eligibility.className,
+              ].join(" ")}
+            >
+              {eligibility.label}
+            </div>
           </div>
+          <p className="mt-2 text-sm text-zinc-400">{eligibilityReason}</p>
         </div>
 
         <div className="flex shrink-0 items-center gap-2">
@@ -174,6 +214,12 @@ export default function ServiceCard({ service }: ServiceCardProps) {
             </div>
             <div>
               <span className="text-zinc-400">Delay:</span> {formatDelay(delayMins)}
+            </div>
+            <div>
+              <span className="text-zinc-400">Eligibility:</span> {eligibility.label}
+            </div>
+            <div>
+              <span className="text-zinc-400">Reason:</span> {eligibilityReason}
             </div>
             <div>
               <span className="text-zinc-400">Calls at destination:</span>{" "}

@@ -1,8 +1,8 @@
 import { DarwinHttpError, getJson } from "@/lib/darwin/client";
-import type { DarwinNormalizedService } from "@/lib/darwin/types";
+import { rankServicesForJourney } from "@/lib/darwin/match";
+import type { DarwinMatchingDiagnostics, DarwinNormalizedService } from "@/lib/darwin/types";
 import { deriveDelayAndStatus } from "@/lib/status/deriveDelayAndStatus";
-import { hhmmToMins } from "@/lib/time/hhmm";
-import { absDeltaMins, isWithinWindow } from "@/lib/time/window";
+import { isWithinWindow } from "@/lib/time/window";
 
 type DarwinBoardParams = {
   from: string;
@@ -117,7 +117,7 @@ function looksLikeService(record: UnknownRecord) {
       pickString(record, SCHEDULED_DEPARTURE_KEYS) ||
       pickString(record, EXPECTED_DEPARTURE_KEYS) ||
       pickString(record, SCHEDULED_ARRIVAL_KEYS) ||
-      pickString(record, EXPECTED_ARRIVAL_KEYS)
+      pickString(record, EXPECTED_ARRIVAL_KEYS),
   );
 }
 
@@ -176,6 +176,86 @@ function buildRawStatusText(parts: Array<string | null>) {
 
 function serviceFilterTime(service: DarwinNormalizedService) {
   return service.expectedDeparture ?? service.aimedDeparture;
+}
+
+function buildMatchingDiagnostics(
+  services: DarwinNormalizedService[],
+  requestedTime: string,
+  windowMins: number,
+  rawServiceCount: number,
+): DarwinMatchingDiagnostics {
+  const sampleExclusions: DarwinMatchingDiagnostics["sampleExclusions"] = [];
+  const normalizedServiceSample = services.slice(0, 3).map((service) => ({
+    uid: service.uid,
+    destinationName: service.destinationName,
+    aimedDeparture: service.aimedDeparture,
+    expectedDeparture: service.expectedDeparture,
+    callsAtTo: service.callsAtTo ?? null,
+  }));
+  let excludedMissingFilterTime = 0;
+  let excludedOutsideWindow = 0;
+  let candidateCount = 0;
+  let destinationConfirmedCount = 0;
+  let destinationMismatchCount = 0;
+  let destinationUnknownCount = 0;
+
+  for (const service of services) {
+    const filterTime = serviceFilterTime(service);
+    if (!filterTime) {
+      excludedMissingFilterTime += 1;
+      if (sampleExclusions.length < 5) {
+        sampleExclusions.push({
+          uid: service.uid,
+          reason: "missing_filter_time",
+          filterTime: null,
+          callsAtTo: service.callsAtTo ?? null,
+          destinationName: service.destinationName,
+        });
+      }
+      continue;
+    }
+
+    if (!isWithinWindow(filterTime, requestedTime, windowMins)) {
+      excludedOutsideWindow += 1;
+      if (sampleExclusions.length < 5) {
+        sampleExclusions.push({
+          uid: service.uid,
+          reason: "outside_window",
+          filterTime,
+          callsAtTo: service.callsAtTo ?? null,
+          destinationName: service.destinationName,
+        });
+      }
+      continue;
+    }
+
+    candidateCount += 1;
+    if (service.callsAtTo === true) {
+      destinationConfirmedCount += 1;
+    } else if (service.callsAtTo === false) {
+      destinationMismatchCount += 1;
+    } else {
+      destinationUnknownCount += 1;
+    }
+  }
+
+  return {
+    requestedTime,
+    windowMins,
+    rawServiceCount,
+    normalizedServiceCount: services.length,
+    afterTimeWindowCount: candidateCount,
+    // MVP rule: only confidently wrong services would be excluded by destination.
+    afterDestinationFilterCount: candidateCount - destinationMismatchCount,
+    candidateCount,
+    excludedMissingFilterTime,
+    excludedOutsideWindow,
+    destinationConfirmedCount,
+    destinationMismatchCount,
+    destinationUnknownCount,
+    normalizedServiceSample,
+    sampleExclusions,
+  };
 }
 
 function getConfig(): DarwinGatewayConfig {
@@ -260,8 +340,8 @@ export async function fetchDarwinDepartureBoard(params: DarwinBoardParams) {
   let payload: unknown;
   try {
     payload = await getJson(url, {
-      "x-api-key": config.apiKey,
-      "Ocp-Apim-Subscription-Key": config.apiKey,
+      // The Rail Data gateway expects the API key in the exact header name "x-apikey".
+      "x-apikey": config.apiKey,
     });
   } catch (error) {
     if (error instanceof DarwinHttpError) {
@@ -281,30 +361,52 @@ export async function fetchDarwinDepartureBoard(params: DarwinBoardParams) {
     throw error;
   }
 
-  const services = collectServiceRecords(payload)
-    .map((service, index) => normalizeService(service, params, index))
-    .flatMap((service) => {
-      const filterTime = serviceFilterTime(service);
-      if (!filterTime) return [];
-      if (!isWithinWindow(filterTime, params.time, params.windowMins)) return [];
-      if (service.callsAtTo === false) return [];
-      return [service];
-    })
-    .sort((a, b) => {
-      const aTime = serviceFilterTime(a) ?? "00:00";
-      const bTime = serviceFilterTime(b) ?? "00:00";
-      const deltaA = absDeltaMins(aTime, params.time);
-      const deltaB = absDeltaMins(bTime, params.time);
-      if (deltaA !== deltaB) return deltaA - deltaB;
-      const minsA = hhmmToMins(aTime) ?? Number.POSITIVE_INFINITY;
-      const minsB = hhmmToMins(bTime) ?? Number.POSITIVE_INFINITY;
-      return minsA - minsB;
+  const rawServices = collectServiceRecords(payload);
+  const normalizedServices = rawServices.map((service, index) => normalizeService(service, params, index));
+  const diagnostics = buildMatchingDiagnostics(
+    normalizedServices,
+    params.time,
+    params.windowMins,
+    rawServices.length,
+  );
+  const services = normalizedServices.filter((service) => {
+    const filterTime = serviceFilterTime(service);
+    if (!filterTime) return false;
+    return isWithinWindow(filterTime, params.time, params.windowMins);
+  });
+
+  const matched = rankServicesForJourney(services, { time: params.time });
+
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Darwin] live board matching", {
+      from: params.from,
+      to: params.to,
+      requestedTime: params.time,
+      windowMins: params.windowMins,
+      rawServiceCount: diagnostics.rawServiceCount,
+      normalizedServiceCount: diagnostics.normalizedServiceCount,
+      afterTimeWindowCount: diagnostics.afterTimeWindowCount,
+      afterDestinationFilterCount: diagnostics.afterDestinationFilterCount,
+      normalizedServiceSample: diagnostics.normalizedServiceSample,
+      sampleExclusions: diagnostics.sampleExclusions,
+      topCandidates: matched.services.slice(0, 3).map((service) => ({
+        uid: service.uid,
+        matchScore: service.matchScore ?? null,
+        destinationName: service.destinationName,
+        callsAtTo: service.callsAtTo ?? null,
+        aimedDeparture: service.aimedDeparture,
+        expectedDeparture: service.expectedDeparture,
+        status: service.status,
+      })),
+      diagnostics,
     });
+  }
 
   return {
-    services,
+    ...matched,
+    diagnostics,
     source: "darwin.gateway",
     note:
-      "Using Darwin live Arr/Dep board data from the Rail Data gateway. For local verification, search for a current-time window such as SEV to LBG.",
+      "Using Darwin live Arr/Dep board data from the Rail Data gateway. Services are filtered by departure window and ranked by destination signal plus departure-time proximity.",
   };
 }

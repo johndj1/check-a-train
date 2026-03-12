@@ -1,6 +1,5 @@
+import type { ServiceStatus } from "@/lib/darwin/types";
 import { diffHHMM } from "@/lib/time/hhmm";
-
-export type ServiceStatus = "On time" | "Delayed" | "Cancelled" | "Unknown";
 
 type DelayDerivationInput = {
   cancelled: boolean;

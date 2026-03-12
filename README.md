@@ -39,6 +39,59 @@ curl "http://localhost:3000/api/journeys?from=SEV&to=LBG&date=2026-03-11&time=08
 
 Use a live CRS such as `SEV` and a near-now time window. The route returns normalized `services`, a `source` of `darwin.gateway`, and a `note` describing the live provider.
 
+## Journey Matching And First-Pass Delay
+
+`/api/journeys` now does two small extra steps after Darwin normalization:
+
+1. It ranks services to the searched journey.
+2. It derives a first-pass delay answer from the best match.
+
+### Matching Rules
+
+The matching helper keeps the logic deliberately small:
+
+- Prefer a service that is confirmed to call at the requested destination CRS.
+- Otherwise fall back safely when destination calling-point data is missing.
+- Prefer the service whose planned departure is closest to the searched departure time.
+- Use real-time departure proximity as a secondary tie-break.
+
+The response still includes the ranked `services` array, and now also includes:
+
+- `selectedService`: the best matched Darwin service, or `null`
+- `firstPassStatus`: the derived delay answer for that matched service
+
+Example response shape:
+
+```json
+{
+  "services": [],
+  "selectedService": {
+    "uid": "DARWIN:202603020850",
+    "status": "Delayed",
+    "delayMins": 5,
+    "isBestMatch": true
+  },
+  "firstPassStatus": {
+    "status": "Delayed",
+    "delayMins": 5,
+    "basis": "arrival",
+    "confidence": "high",
+    "matchedServiceUid": "DARWIN:202603020850"
+  }
+}
+```
+
+### Delay Rules
+
+The first-pass delay derivation is intentionally practical:
+
+- Prefer arrival delay when aimed and expected arrival times are both available.
+- Otherwise use departure delay when aimed and expected departure times are available.
+- Treat `On time` as `0` delay.
+- Treat cancelled services safely as `status=Cancelled` with no numeric delay.
+- If Darwin only provides non-time text such as `Delayed`, return a safe status even when exact minutes are unknown.
+- If no service can be matched, return `selectedService=null` and `firstPassStatus.status=\"Unknown\"`.
+
 ## Signals To Product OS
 
 Check-a-Train can emit product signals to Product OS from server-side code. Signals are lightweight JSON events that describe meaningful product behaviour such as:

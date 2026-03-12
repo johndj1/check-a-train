@@ -30,15 +30,17 @@ async function requestText(
 ): Promise<{ status: number; ok: boolean; headers: Headers; body: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const mergedHeaders = new Headers(init.headers ?? {});
+  for (const [key, value] of Object.entries(headers)) {
+    mergedHeaders.set(key, value);
+  }
 
   let res: Response;
   try {
     res = await fetch(url, {
-      headers: {
-        ...headers,
-        ...(init.headers ?? {}),
-      },
       ...init,
+      // Apply merged headers after spreading init so auth headers like x-apikey are not lost.
+      headers: mergedHeaders,
       cache: "no-store",
       signal: controller.signal,
     });

@@ -583,7 +583,7 @@ export default function HomeClient() {
         )}
 
         <footer className="mt-12 text-xs text-zinc-500">
-          Next: expandable per-service drawer + eligibility reasoning + operator mapping coverage.
+          First-pass Delay Repay eligibility now uses delay thresholds plus cancellation handling.
         </footer>
       </div>
     </main>

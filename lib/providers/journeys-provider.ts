@@ -2,7 +2,11 @@ import { getFixtureJourneys } from "@/lib/darwin/fixture";
 import { DarwinHttpError, DarwinTimeoutError } from "@/lib/darwin/client";
 import { DarwinCredentialsError, fetchDarwinDepartureBoard } from "@/lib/darwin/ldbws";
 import { emitProductSignal } from "@/lib/productos-signal";
-import type { DarwinNormalizedService } from "@/lib/darwin/types";
+import type {
+  DarwinFirstPassStatus,
+  DarwinMatchingDiagnostics,
+  DarwinNormalizedService,
+} from "@/lib/darwin/types";
 
 export type JourneyProviderQuery = {
   from: string;
@@ -15,6 +19,9 @@ export type JourneyProviderQuery = {
 
 export type JourneyProviderResult = {
   services: DarwinNormalizedService[];
+  selectedService: DarwinNormalizedService | null;
+  firstPassStatus: DarwinFirstPassStatus;
+  diagnostics?: DarwinMatchingDiagnostics;
   source: string;
   note: string;
 };
@@ -253,18 +260,11 @@ export async function getJourneysFromProvider(query: JourneyProviderQuery): Prom
       requestedTime: normalizedTime,
       windowMins: query.windowMins,
       afterCount: result.services.length,
+      selectedServiceUid: result.selectedService?.uid ?? null,
+      firstPassStatus: result.firstPassStatus,
+      diagnostics: result.diagnostics ?? null,
     });
   }
 
-  const note = [
-    result.note,
-    query.filterDest ? "Destination filtering skipped because calling-point data is not available yet." : null,
-  ]
-    .filter((v): v is string => Boolean(v))
-    .join(" ");
-
-  return {
-    ...result,
-    note,
-  };
+  return result;
 }

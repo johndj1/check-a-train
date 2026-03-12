@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getJourneysFromProvider, JourneyProviderError } from "@/lib/providers/journeys-provider";
+import { deriveDelayRepayEligibility } from "@/lib/delay-repay/eligibility";
 import { emitProductSignal, isRealUsageSignalContext } from "@/lib/productos-signal";
 
 function toHHMM(v: unknown): string | null {
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
     if (!from || !to || !date || !timeRaw) {
       return NextResponse.json(
         { error: "Missing required params: from, to, date, time" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -50,14 +51,14 @@ export async function GET(req: Request) {
     if (!time) {
       return NextResponse.json(
         { error: "Invalid time format. Expected HH:MM." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (!parseISODate(date)) {
       return NextResponse.json(
         { error: "Invalid date format. Expected YYYY-MM-DD." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -70,42 +71,62 @@ export async function GET(req: Request) {
       filterDest,
     });
 
-    const delayedServices = providerResult.services.filter(
-      (service) =>
-        service.status === "Delayed" ||
-        (typeof service.delayMins === "number" && service.delayMins > 0),
+    const services = providerResult.services.map((service) => {
+      const eligibility = deriveDelayRepayEligibility({
+        delayMins: service.delayMins,
+      });
+
+      return {
+        ...service,
+        isEligible: eligibility.isEligible,
+        eligibilityReason: eligibility.eligibilityReason,
+        eligibilityBand: eligibility.eligibilityBand,
+      };
+    });
+
+    const matchedService =
+      providerResult.selectedService === null
+        ? null
+        : services.find((service) => service.uid === providerResult.selectedService?.uid) ?? null;
+    const matchedServiceIsDelayed = Boolean(
+      matchedService &&
+        matchedService.isEligible,
     );
 
-    if (isRealUsageSignalContext(providerResult.source)) {
-      for (const service of delayedServices.slice(0, 5)) {
-        void emitProductSignal("delay_detected", {
-          from,
-          to,
-          date,
-          time,
-          window_mins: windowMins,
-          provider_source: providerResult.source,
-          journey_stage: "delayed_service_presented",
-          user_outcome: "claim_opportunity_identified",
-          service_uid: service.uid,
-          operator: service.operator,
-          operator_name: service.operatorName,
-          operator_known: Boolean(service.operator),
-          origin_name: service.originName,
-          destination_name: service.destinationName,
-          status: service.status,
-          delay_mins: service.delayMins,
-          aimed_departure: service.aimedDeparture,
-          expected_departure: service.expectedDeparture,
-          aimed_arrival: service.aimedArrival,
-          expected_arrival: service.expectedArrival,
-        });
-      }
+    if (matchedService && matchedServiceIsDelayed && isRealUsageSignalContext(providerResult.source)) {
+      void emitProductSignal("delay_detected", {
+        from,
+        to,
+        date,
+        time,
+        window_mins: windowMins,
+        provider_source: providerResult.source,
+        journey_stage: "delayed_service_presented",
+        user_outcome: "claim_opportunity_identified",
+        matched_service: true,
+        service_uid: matchedService.uid,
+        operator: matchedService.operator,
+        operator_name: matchedService.operatorName,
+        operator_known: Boolean(matchedService.operator),
+        origin_name: matchedService.originName,
+        destination_name: matchedService.destinationName,
+        status: providerResult.firstPassStatus.status,
+        delay_mins: providerResult.firstPassStatus.delayMins,
+        status_basis: providerResult.firstPassStatus.basis,
+        status_confidence: providerResult.firstPassStatus.confidence,
+        aimed_departure: matchedService.aimedDeparture,
+        expected_departure: matchedService.expectedDeparture,
+        aimed_arrival: matchedService.aimedArrival,
+        expected_arrival: matchedService.expectedArrival,
+      });
     }
 
     return NextResponse.json({
       query: { from, to, date, time, window: windowMins },
-      services: providerResult.services,
+      services,
+      selectedService: matchedService,
+      firstPassStatus: providerResult.firstPassStatus,
+      diagnostics: providerResult.diagnostics ?? null,
       source: providerResult.source,
       note: providerResult.note,
     });
@@ -117,7 +138,7 @@ export async function GET(req: Request) {
           retryable: err.retryable,
           failureClass: err.failureClass,
         },
-        { status: err.status }
+        { status: err.status },
       );
     }
 
@@ -127,7 +148,7 @@ export async function GET(req: Request) {
         error: "Something went wrong while loading journeys. Please try again.",
         retryable: true,
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

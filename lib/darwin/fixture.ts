@@ -1,9 +1,13 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { DarwinFixtureFetchParams, DarwinNormalizedService } from "@/lib/darwin/types";
+import { rankServicesForJourney } from "@/lib/darwin/match";
+import type {
+  DarwinFixtureFetchParams,
+  DarwinMatchingDiagnostics,
+  DarwinNormalizedService,
+} from "@/lib/darwin/types";
 import { deriveDelayAndStatus } from "@/lib/status/deriveDelayAndStatus";
-import { hhmmToMins } from "@/lib/time/hhmm";
-import { absDeltaMins, isWithinWindow } from "@/lib/time/window";
+import { isWithinWindow } from "@/lib/time/window";
 
 type FixtureService = {
   rid: string;
@@ -78,30 +82,73 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
       delayMins,
       status,
       callsAtTo: undefined,
+      rawStatusText: service.status,
       _timetableId: service.rid,
     };
   });
 
-  const withinWindow = baseServices
-    .flatMap((service) => {
+  const withinWindow = baseServices.filter((service) => {
+    const at = filterTime(service);
+    if (!at) return false;
+    return isWithinWindow(at, requestedTime, windowMins);
+  });
+
+  const matched = rankServicesForJourney(withinWindow, { time: requestedTime });
+  const sampleExclusions: DarwinMatchingDiagnostics["sampleExclusions"] = [];
+  const normalizedServiceSample = baseServices.slice(0, 3).map((service) => ({
+    uid: service.uid,
+    destinationName: service.destinationName,
+    aimedDeparture: service.aimedDeparture,
+    expectedDeparture: service.expectedDeparture,
+    callsAtTo: service.callsAtTo ?? null,
+  }));
+  for (const service of baseServices) {
+    const at = filterTime(service);
+    if (!at) {
+      if (sampleExclusions.length < 5) {
+        sampleExclusions.push({
+          uid: service.uid,
+          reason: "missing_filter_time",
+          filterTime: null,
+          callsAtTo: service.callsAtTo ?? null,
+          destinationName: service.destinationName,
+        });
+      }
+      continue;
+    }
+    if (!isWithinWindow(at, requestedTime, windowMins) && sampleExclusions.length < 5) {
+      sampleExclusions.push({
+        uid: service.uid,
+        reason: "outside_window",
+        filterTime: at,
+        callsAtTo: service.callsAtTo ?? null,
+        destinationName: service.destinationName,
+      });
+    }
+  }
+  const diagnostics: DarwinMatchingDiagnostics = {
+    requestedTime,
+    windowMins,
+    rawServiceCount: payload.services?.length ?? 0,
+    normalizedServiceCount: baseServices.length,
+    afterTimeWindowCount: withinWindow.length,
+    afterDestinationFilterCount: withinWindow.length,
+    candidateCount: withinWindow.length,
+    excludedMissingFilterTime: baseServices.filter((service) => !filterTime(service)).length,
+    excludedOutsideWindow: baseServices.filter((service) => {
       const at = filterTime(service);
-      if (!at) return [];
-      if (!isWithinWindow(at, requestedTime, windowMins)) return [];
-      return [service];
-    })
-    .sort((a, b) => {
-      const aTime = filterTime(a) ?? "00:00";
-      const bTime = filterTime(b) ?? "00:00";
-      const deltaA = absDeltaMins(aTime, requestedTime);
-      const deltaB = absDeltaMins(bTime, requestedTime);
-      if (deltaA !== deltaB) return deltaA - deltaB;
-      const minsA = hhmmToMins(aTime) ?? Number.POSITIVE_INFINITY;
-      const minsB = hhmmToMins(bTime) ?? Number.POSITIVE_INFINITY;
-      return minsA - minsB;
-    });
+      return at ? !isWithinWindow(at, requestedTime, windowMins) : false;
+    }).length,
+    destinationConfirmedCount: 0,
+    destinationMismatchCount: 0,
+    destinationUnknownCount: withinWindow.length,
+    normalizedServiceSample,
+    sampleExclusions,
+  };
 
   return {
-    services: withinWindow,
+    ...matched,
+    diagnostics,
     source: "darwin.fixture",
     note: "Using Darwin fixture data (DARWIN_MODE=fixture).",
   };
