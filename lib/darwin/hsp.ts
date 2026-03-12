@@ -1,4 +1,4 @@
-import { postJson } from "@/lib/darwin/client";
+import { DarwinTimeoutError, postJson } from "@/lib/darwin/client";
 import { rankServicesForJourney } from "@/lib/darwin/match";
 import type {
   DarwinMatchingDiagnostics,
@@ -22,6 +22,20 @@ type HspServiceDetails = {
   locations: HspLocation[];
   lateCancelReason: string | null;
 };
+
+type HspServiceDetailSummary = {
+  aimedDeparture: string | null;
+  expectedDeparture: string | null;
+  aimedArrival: string | "";
+  expectedArrival: string | null;
+  delayMins: number | null;
+  status: DarwinNormalizedService["status"];
+  callsAtTo?: boolean;
+  rawStatusText?: string | null;
+};
+
+const HSP_SERVICE_DETAILS_TIMEOUT_MS = 12000;
+const HSP_MVP_DETAILS_LIMIT = 1;
 
 export class HspCredentialsError extends Error {
   constructor(message = "Missing HSP credentials.") {
@@ -63,6 +77,57 @@ function pickRecordArray(obj: Record<string, unknown>, keys: string[]) {
   const value = findValue(obj, keys);
   if (!Array.isArray(value)) return null;
   return value.filter(isRecord);
+}
+
+function findFirstStringDeep(node: unknown, keys: string[], seen = new Set<unknown>()): string | null {
+  if (!isRecord(node) && !Array.isArray(node)) return null;
+  if (seen.has(node)) return null;
+  seen.add(node);
+
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      const found = findFirstStringDeep(entry, keys, seen);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const direct = pickString(node, keys);
+  if (direct) return direct;
+
+  for (const value of Object.values(node)) {
+    const found = findFirstStringDeep(value, keys, seen);
+    if (found) return found;
+  }
+  return null;
+}
+
+function collectRecordsDeep(
+  node: unknown,
+  predicate: (record: Record<string, unknown>) => boolean,
+  seen = new Set<unknown>(),
+  matches: Record<string, unknown>[] = [],
+) {
+  if (!isRecord(node) && !Array.isArray(node)) return matches;
+  if (seen.has(node)) return matches;
+  seen.add(node);
+
+  if (Array.isArray(node)) {
+    for (const entry of node) {
+      collectRecordsDeep(entry, predicate, seen, matches);
+    }
+    return matches;
+  }
+
+  if (predicate(node)) {
+    matches.push(node);
+    return matches;
+  }
+
+  for (const value of Object.values(node)) {
+    collectRecordsDeep(value, predicate, seen, matches);
+  }
+  return matches;
 }
 
 function parseISODate(dateStr: string) {
@@ -151,22 +216,57 @@ function extractMetrics(payload: unknown) {
     .filter((v): v is HspServiceMetric => v !== null);
 }
 
+function looksLikeHspLocation(record: Record<string, unknown>) {
+  return Boolean(
+    pickString(record, [
+      "location",
+      "crs",
+      "tpl",
+      "crs_code",
+      "location_code",
+      "stanox",
+      "gbtt_ptd",
+      "gbtt_pta",
+      "actual_td",
+      "actual_ta",
+    ]),
+  );
+}
+
 function parseServiceDetailsPayload(payload: unknown): HspServiceDetails {
   const root = isRecord(payload) ? payload : {};
   const detailRoot =
     pickRecordArray(root, ["Services", "services", "serviceDetails"])?.[0] ??
+    pickRecordArray(root, ["serviceAttributesDetails", "serviceAttributeDetails"])?.[0] ??
     pickRecord(root, ["serviceDetails"]) ??
+    pickRecord(root, ["serviceAttributesDetails", "serviceAttributeDetails"]) ??
     root;
   const detailObj = isRecord(detailRoot) ? detailRoot : {};
+  const locations =
+    pickRecordArray(detailObj, ["locations", "location"]) ??
+    pickRecordArray(root, ["locations", "location"]) ??
+    collectRecordsDeep(detailObj, looksLikeHspLocation);
+
   return {
-    locations: pickRecordArray(detailObj, ["locations"]) ?? [],
-    lateCancelReason: pickString(detailObj, ["late_canc_reason", "lateCancelReason"]),
+    locations,
+    lateCancelReason:
+      pickString(detailObj, ["late_canc_reason", "lateCancelReason"]) ??
+      findFirstStringDeep(detailObj, ["late_canc_reason", "lateCancelReason", "cancelReason", "cancelReasonCode"]),
   };
 }
 
 function findLocationByCrs(locations: HspLocation[], crs: string) {
   const upper = crs.toUpperCase();
-  return locations.find((loc) => pickString(loc, ["location", "crs", "tpl"])?.toUpperCase() === upper) ?? null;
+  return (
+    locations.find((loc) =>
+      [
+        findFirstStringDeep(loc, ["location", "crs", "tpl", "crs_code", "location_code"]),
+        findFirstStringDeep(loc, ["locationName", "name"]),
+      ]
+        .filter((value): value is string => Boolean(value))
+        .some((value) => value.toUpperCase() === upper),
+    ) ?? null
+  );
 }
 
 function getConfig() {
@@ -189,13 +289,143 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
   });
 }
 
-export async function serviceDetails(rid: string) {
+export async function serviceDetails(rid: string, timeoutMs?: number) {
   const config = getConfig();
   return postJson(
     `${config.baseUrl}/serviceDetails`,
     { rid },
-    { "x-apikey": config.apiKey }
+    { "x-apikey": config.apiKey },
+    timeoutMs ? { timeoutMs } : {},
   );
+}
+
+function clampPositiveInt(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min;
+  return Math.min(Math.max(Math.floor(value), min), max);
+}
+
+async function loadHspServiceDetailSummary(
+  rid: string,
+  params: Pick<HspServicesParams, "from" | "to">,
+  timeoutMs = HSP_SERVICE_DETAILS_TIMEOUT_MS,
+): Promise<HspServiceDetailSummary> {
+  if (process.env.NODE_ENV === "development") {
+    console.info("[HSP] serviceDetails requested", {
+      rid,
+      from: params.from,
+      to: params.to,
+      timeoutMs,
+    });
+  }
+
+  const detailsPayload = await serviceDetails(rid, timeoutMs);
+  const details = parseServiceDetailsPayload(detailsPayload);
+  const toLoc = findLocationByCrs(details.locations, params.to);
+  const fromLoc = findLocationByCrs(details.locations, params.from);
+  const cancelled =
+    Boolean(details.lateCancelReason) ||
+    Boolean(toLoc && pickString(toLoc, ["late_canc_reason", "lateCancelReason"]));
+  const aimedArrival = toHHMM(toLoc ? pickString(toLoc, ["gbtt_pta"]) : null);
+  const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
+  const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
+  const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
+  const { delayMins, status } = deriveDelayAndStatus({
+    cancelled,
+    aimedArr: aimedArrival,
+    expectedArr: actualArrival,
+    aimedDep: aimedDeparture,
+    expectedDep: actualDeparture,
+  });
+
+  if (process.env.NODE_ENV === "development") {
+    console.info("[HSP] serviceDetails succeeded", {
+      rid,
+      from: params.from,
+      to: params.to,
+      callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
+      aimedDeparture,
+      actualDeparture,
+      aimedArrival,
+      actualArrival,
+      status,
+      delayMins,
+    });
+  }
+
+  return {
+    aimedDeparture,
+    expectedDeparture: actualDeparture,
+    aimedArrival: aimedArrival ?? "",
+    expectedArrival: actualArrival,
+    delayMins,
+    status,
+    callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
+    rawStatusText: cancelled ? "Cancelled" : "Historical timing data",
+  };
+}
+
+async function enrichSelectedHspServices(
+  services: DarwinNormalizedService[],
+  params: HspServicesParams,
+  detailUidSet: Set<string>,
+) {
+  if (detailUidSet.size === 0 || services.length === 0) {
+    return services;
+  }
+
+  const results = [...services];
+  for (const [index, service] of services.entries()) {
+    if (!detailUidSet.has(service.uid)) {
+      continue;
+    }
+
+    const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
+    if (!rid) {
+      continue;
+    }
+
+    try {
+      const detail = await loadHspServiceDetailSummary(rid, params);
+
+      results[index] = {
+        ...service,
+        aimedDeparture: detail.aimedDeparture ?? service.aimedDeparture,
+        expectedDeparture: detail.expectedDeparture,
+        aimedArrival: detail.aimedArrival,
+        expectedArrival: detail.expectedArrival,
+        delayMins: detail.delayMins,
+        status: detail.status,
+        callsAtTo: detail.callsAtTo,
+        rawStatusText: detail.rawStatusText,
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown error";
+      if (process.env.NODE_ENV === "development") {
+        if (error instanceof DarwinTimeoutError) {
+          console.warn("[HSP] serviceDetails timed out", {
+            rid,
+            from: params.from,
+            to: params.to,
+            timeoutMs: HSP_SERVICE_DETAILS_TIMEOUT_MS,
+          });
+        } else {
+          console.warn("[HSP] serviceDetails failed", {
+            rid,
+            from: params.from,
+            to: params.to,
+            message,
+          });
+        }
+        console.info("[HSP] falling back to base service", {
+          rid,
+          uid: service.uid,
+          from: params.from,
+          to: params.to,
+        });
+      }
+    }
+  }
+  return results;
 }
 
 export async function fetchHspServices(params: HspServicesParams) {
@@ -217,6 +447,15 @@ export async function fetchHspServices(params: HspServicesParams) {
   });
 
   const metrics = extractMetrics(metricsPayload);
+  if (process.env.NODE_ENV === "development") {
+    console.info("[HSP] serviceMetrics succeeded", {
+      from: params.from,
+      to: params.to,
+      date: params.date,
+      requestedTime: params.time,
+      rawServiceCount: metrics.length,
+    });
+  }
   const baseServices: DarwinNormalizedService[] = metrics.map((metric, idx) => ({
     uid: `HSP:${metric.rid}`,
     operator: metric.tocCode,
@@ -234,58 +473,9 @@ export async function fetchHspServices(params: HspServicesParams) {
     _timetableId: metric.rid ?? `hsp-${idx}`,
   }));
 
-  const detailsLimit = Math.min(Math.max(params.detailsLimit ?? 5, 0), 10);
-  const enriched = await Promise.all(
-    baseServices.slice(0, detailsLimit).map(async (service) => {
-      const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
-      if (!rid) return null;
-      try {
-        const detailsPayload = await serviceDetails(rid);
-        const details = parseServiceDetailsPayload(detailsPayload);
-        const toLoc = findLocationByCrs(details.locations, params.to);
-        const fromLoc = findLocationByCrs(details.locations, params.from);
-        const cancelled =
-          Boolean(details.lateCancelReason) ||
-          Boolean(toLoc && pickString(toLoc, ["late_canc_reason", "lateCancelReason"]));
-
-        const aimedArrival = toHHMM(toLoc ? pickString(toLoc, ["gbtt_pta"]) : null);
-        const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
-        const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
-        const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
-        const { delayMins, status } = deriveDelayAndStatus({
-          cancelled,
-          aimedArr: aimedArrival,
-          expectedArr: actualArrival,
-          aimedDep: aimedDeparture,
-          expectedDep: actualDeparture,
-        });
-        return {
-          uid: service.uid,
-          aimedArrival: aimedArrival ?? "",
-          expectedArrival: actualArrival,
-          delayMins,
-          status,
-        };
-      } catch {
-        return null;
-      }
-    })
-  );
-
-  const byUid = new Map(
-    enriched.filter((v): v is NonNullable<typeof v> => v !== null).map((entry) => [entry.uid, entry])
-  );
-  const services = baseServices.map((service) => {
-    const detail = byUid.get(service.uid);
-    if (!detail) return service;
-    return {
-      ...service,
-      aimedArrival: detail.aimedArrival,
-      expectedArrival: detail.expectedArrival,
-      delayMins: detail.delayMins,
-      status: detail.status,
-    };
-  });
+  const detailsLimit = clampPositiveInt(params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT, 0, HSP_MVP_DETAILS_LIMIT);
+  const detailUidSet = new Set(baseServices.slice(0, detailsLimit).map((service) => service.uid));
+  const services = await enrichSelectedHspServices(baseServices, params, detailUidSet);
 
   return {
     services,
@@ -306,64 +496,13 @@ export async function fetchHspJourneys(params: HspServicesParams) {
 
   const base = await fetchHspServices({ ...params, detailsLimit: 0 });
   const preRanked = rankServicesForJourney(base.services, { time: requestedTime });
-  const detailsLimit = Math.min(Math.max(params.detailsLimit ?? 8, 0), Math.max(preRanked.services.length, 0));
-  const detailUidSet = new Set(preRanked.services.slice(0, detailsLimit).map((service) => service.uid));
-
-  const enriched = await Promise.all(
-    preRanked.services.map(async (service) => {
-      if (!detailUidSet.has(service.uid)) {
-        return service;
-      }
-
-      const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
-      if (!rid) {
-        return service;
-      }
-
-      try {
-        const detailsPayload = await serviceDetails(rid);
-        const details = parseServiceDetailsPayload(detailsPayload);
-        const toLoc = findLocationByCrs(details.locations, params.to);
-        const fromLoc = findLocationByCrs(details.locations, params.from);
-        const cancelled =
-          Boolean(details.lateCancelReason) ||
-          Boolean(toLoc && pickString(toLoc, ["late_canc_reason", "lateCancelReason"]));
-        const aimedArrival = toHHMM(toLoc ? pickString(toLoc, ["gbtt_pta"]) : null);
-        const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
-        const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
-        const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
-        const { delayMins, status } = deriveDelayAndStatus({
-          cancelled,
-          aimedArr: aimedArrival,
-          expectedArr: actualArrival,
-          aimedDep: aimedDeparture,
-          expectedDep: actualDeparture,
-        });
-
-        return {
-          ...service,
-          aimedDeparture: aimedDeparture ?? service.aimedDeparture,
-          expectedDeparture: actualDeparture,
-          aimedArrival: aimedArrival ?? "",
-          expectedArrival: actualArrival,
-          delayMins,
-          status,
-          callsAtTo: toLoc ? true : undefined,
-          rawStatusText: cancelled ? "Cancelled" : "Historical timing data",
-        };
-      } catch (error) {
-        if (process.env.NODE_ENV === "development") {
-          console.warn("[HSP] service details lookup failed", {
-            rid,
-            from: params.from,
-            to: params.to,
-            message: error instanceof Error ? error.message : "Unknown error",
-          });
-        }
-        return service;
-      }
-    })
+  const detailsLimit = clampPositiveInt(
+    params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT,
+    0,
+    Math.min(HSP_MVP_DETAILS_LIMIT, Math.max(preRanked.services.length, 0)),
   );
+  const detailUidSet = new Set(preRanked.services.slice(0, detailsLimit).map((service) => service.uid));
+  const enriched = await enrichSelectedHspServices(preRanked.services, params, detailUidSet);
 
   const matched = rankServicesForJourney(enriched, { time: requestedTime });
   const destinationConfirmedCount = enriched.filter((service) => service.callsAtTo === true).length;

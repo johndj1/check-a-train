@@ -4,6 +4,10 @@ export function buildBasicAuthHeader(user: string, pass: string) {
 
 const REQUEST_TIMEOUT_MS = 5000;
 
+type DarwinRequestOptions = {
+  timeoutMs?: number;
+};
+
 export class DarwinTimeoutError extends Error {
   constructor(message = "Darwin request timed out.") {
     super(message);
@@ -26,10 +30,15 @@ export class DarwinHttpError extends Error {
 async function requestText(
   url: string,
   init: RequestInit,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  options: DarwinRequestOptions = {},
 ): Promise<{ status: number; ok: boolean; headers: Headers; body: string }> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutMs =
+    typeof options.timeoutMs === "number" && Number.isFinite(options.timeoutMs) && options.timeoutMs > 0
+      ? options.timeoutMs
+      : REQUEST_TIMEOUT_MS;
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const mergedHeaders = new Headers(init.headers ?? {});
   for (const [key, value] of Object.entries(headers)) {
     mergedHeaders.set(key, value);
@@ -70,7 +79,8 @@ async function requestText(
 export async function postJson(
   url: string,
   body: unknown,
-  headers: Record<string, string> = {}
+  headers: Record<string, string> = {},
+  options: DarwinRequestOptions = {},
 ): Promise<unknown> {
   const response = await requestText(
     url,
@@ -81,7 +91,8 @@ export async function postJson(
         "Content-Type": "application/json",
       },
     },
-    headers
+    headers,
+    options,
   );
   let parsed: unknown = null;
   try {
@@ -97,7 +108,8 @@ export async function postText(
   url: string,
   body: string,
   headers: Record<string, string> = {},
-  contentType = "text/xml; charset=utf-8"
+  contentType = "text/xml; charset=utf-8",
+  options: DarwinRequestOptions = {},
 ) {
   const response = await requestText(
     url,
@@ -108,12 +120,17 @@ export async function postText(
         "Content-Type": contentType,
       },
     },
-    headers
+    headers,
+    options,
   );
   return response.body;
 }
 
-export async function getJson(url: string, headers: Record<string, string> = {}) {
+export async function getJson(
+  url: string,
+  headers: Record<string, string> = {},
+  options: DarwinRequestOptions = {},
+) {
   const response = await requestText(
     url,
     {
@@ -122,7 +139,8 @@ export async function getJson(url: string, headers: Record<string, string> = {})
         Accept: "application/json",
       },
     },
-    headers
+    headers,
+    options,
   );
 
   try {
@@ -132,13 +150,18 @@ export async function getJson(url: string, headers: Record<string, string> = {})
   }
 }
 
-export async function getText(url: string, headers: Record<string, string> = {}) {
+export async function getText(
+  url: string,
+  headers: Record<string, string> = {},
+  options: DarwinRequestOptions = {},
+) {
   const response = await requestText(
     url,
     {
       method: "GET",
     },
-    headers
+    headers,
+    options,
   );
   return response.body;
 }
