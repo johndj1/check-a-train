@@ -21,6 +21,51 @@ function statusClass(status: Service["status"]) {
   return "text-red-300";
 }
 
+function statusBasisLabel(basis: Service["statusBasis"]) {
+  if (basis === "arrival") return "Arrival timing";
+  if (basis === "departure") return "Departure timing";
+  if (basis === "raw_status") return "Live board status";
+  return "Limited evidence";
+}
+
+function confidenceCopy(confidence: Service["statusConfidence"]) {
+  if (confidence === "high") {
+    return {
+      label: "High confidence",
+      className: "border-emerald-800/70 bg-emerald-950/30 text-emerald-200",
+    };
+  }
+  if (confidence === "medium") {
+    return {
+      label: "Medium confidence",
+      className: "border-amber-800/70 bg-amber-950/30 text-amber-200",
+    };
+  }
+  return {
+    label: "Low confidence",
+    className: "border-zinc-800 bg-zinc-900 text-zinc-400",
+  };
+}
+
+function destinationStopCopy(callsAtTo: boolean | undefined) {
+  if (callsAtTo === true) {
+    return {
+      label: "Calls at selected destination",
+      className: "border-emerald-800/70 bg-emerald-950/30 text-emerald-200",
+    };
+  }
+  if (callsAtTo === false) {
+    return {
+      label: "Destination does not match selected stop",
+      className: "border-red-900/70 bg-red-950/30 text-red-200",
+    };
+  }
+  return {
+    label: "Destination calling point not confirmed",
+    className: "border-zinc-800 bg-zinc-900 text-zinc-400",
+  };
+}
+
 function eligibilityCopy(service: Partial<Service>) {
   const band = service.eligibilityBand ?? "unknown_delay";
 
@@ -76,7 +121,26 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     typeof service.eligibilityReason === "string" && service.eligibilityReason.trim().length > 0
       ? service.eligibilityReason
       : "Not eligible yet";
+  const rawStatusText =
+    typeof service.rawStatusText === "string" && service.rawStatusText.trim().length > 0
+      ? service.rawStatusText
+      : null;
+  const statusBasis =
+    service.statusBasis === "arrival" ||
+    service.statusBasis === "departure" ||
+    service.statusBasis === "raw_status" ||
+    service.statusBasis === "unknown"
+      ? service.statusBasis
+      : "unknown";
+  const statusConfidence =
+    service.statusConfidence === "high" ||
+    service.statusConfidence === "medium" ||
+    service.statusConfidence === "low"
+      ? service.statusConfidence
+      : "low";
   const eligibility = eligibilityCopy(service);
+  const confidence = confidenceCopy(statusConfidence);
+  const destinationStop = destinationStopCopy(callsAtTo);
 
   const arrival = expectedArrival ?? (aimedArrival || "—");
   const claimHref = operator && isEligible
@@ -104,6 +168,9 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     `Aimed arrival: ${aimedArrival || "Unknown"}`,
     `Expected arrival: ${expectedArrival ?? "Unknown"}`,
     `Delay: ${formatDelay(delayMins)}`,
+    `Status evidence: ${statusBasisLabel(statusBasis)}`,
+    `Status confidence: ${confidence.label}`,
+    `Live board detail: ${rawStatusText ?? "Unknown"}`,
     `Eligibility: ${eligibility.label}`,
     `Eligibility reason: ${eligibilityReason}`,
     `Calls at destination: ${callsAtTo == null ? "Unknown" : callsAtTo ? "Yes" : "No"}`,
@@ -210,39 +277,100 @@ export default function ServiceCard({ service }: ServiceCardProps) {
       >
         <div className="min-h-0">
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-3 text-sm text-zinc-300">
-            <div>
-              <span className="text-zinc-400">UID:</span> {uid}
+            <div className="flex flex-wrap items-center gap-2">
+              <div
+                className={[
+                  "rounded-full border px-2 py-1 text-xs font-medium",
+                  confidence.className,
+                ].join(" ")}
+              >
+                {confidence.label}
+              </div>
+              <div
+                className={[
+                  "rounded-full border px-2 py-1 text-xs font-medium",
+                  destinationStop.className,
+                ].join(" ")}
+              >
+                {destinationStop.label}
+              </div>
             </div>
-            <div>
-              <span className="text-zinc-400">Origin:</span> {originName}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  Timing evidence
+                </h3>
+                <dl className="mt-2 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Planned departure</dt>
+                    <dd className="text-right text-zinc-100">{aimedDeparture}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Live departure</dt>
+                    <dd className="text-right text-zinc-100">{expectedDeparture ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Planned arrival</dt>
+                    <dd className="text-right text-zinc-100">{aimedArrival || "—"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Live arrival</dt>
+                    <dd className="text-right text-zinc-100">{expectedArrival ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Delay shown</dt>
+                    <dd className="text-right font-medium text-zinc-100">{formatDelay(delayMins)}</dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  Service details
+                </h3>
+                <dl className="mt-2 space-y-2">
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Service UID</dt>
+                    <dd className="text-right text-zinc-100">{uid}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Route</dt>
+                    <dd className="text-right text-zinc-100">
+                      {originName} → {destinationName}
+                    </dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Platform</dt>
+                    <dd className="text-right text-zinc-100">{platform ?? "—"}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Delay basis</dt>
+                    <dd className="text-right text-zinc-100">{statusBasisLabel(statusBasis)}</dd>
+                  </div>
+                  <div className="flex items-start justify-between gap-3">
+                    <dt className="text-zinc-500">Data source</dt>
+                    <dd className="text-right text-zinc-100">{providerSource || "Unknown"}</dd>
+                  </div>
+                </dl>
+              </section>
             </div>
-            <div>
-              <span className="text-zinc-400">Destination:</span> {destinationName}
-            </div>
-            <div>
-              <span className="text-zinc-400">Aimed departure:</span> {aimedDeparture}
-            </div>
-            <div>
-              <span className="text-zinc-400">Expected departure:</span> {expectedDeparture ?? "—"}
-            </div>
-            <div>
-              <span className="text-zinc-400">Aimed arrival:</span> {aimedArrival || "—"}
-            </div>
-            <div>
-              <span className="text-zinc-400">Expected arrival:</span> {expectedArrival ?? "—"}
-            </div>
-            <div>
-              <span className="text-zinc-400">Delay:</span> {formatDelay(delayMins)}
-            </div>
-            <div>
-              <span className="text-zinc-400">Eligibility:</span> {eligibility.label}
-            </div>
-            <div>
-              <span className="text-zinc-400">Reason:</span> {eligibilityReason}
-            </div>
-            <div>
-              <span className="text-zinc-400">Calls at destination:</span>{" "}
-              {callsAtTo == null ? "Unknown" : callsAtTo ? "Yes" : "No"}
+
+            <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  Delay Repay check
+                </h3>
+                <p className="mt-2 text-zinc-100">{eligibility.label}</p>
+                <p className="mt-2 text-zinc-400">{eligibilityReason}</p>
+              </section>
+
+              <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+                <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                  Live feed note
+                </h3>
+                <p className="mt-2 text-zinc-100">{rawStatusText ?? "No extra live status text available."}</p>
+              </section>
             </div>
           </div>
         </div>

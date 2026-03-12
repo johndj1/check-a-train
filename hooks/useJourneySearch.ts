@@ -18,6 +18,9 @@ export type Service = {
 
   status: "On time" | "Delayed" | "Cancelled" | "Unknown";
   callsAtTo?: boolean;
+  rawStatusText?: string | null;
+  statusBasis?: "arrival" | "departure" | "raw_status" | "unknown";
+  statusConfidence?: "high" | "medium" | "low";
   isEligible?: boolean;
   eligibilityReason?: string;
   eligibilityBand?: "eligible" | "below_threshold" | "unknown_delay";
