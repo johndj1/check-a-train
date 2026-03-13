@@ -14,6 +14,7 @@
     "resolve:darwin-candidate-stops": "node scripts/resolve-darwin-candidate-stops.mjs",
     "report:southeastern-corridor-coverage": "node scripts/report-southeastern-corridor-coverage.mjs",
     "map:southeastern-canonical": "node scripts/map-southeastern-corridor-to-canonical.mjs",
+    "load:southeastern-canonical-subset": "node scripts/load-southeastern-canonical-subset.mjs",
     "report:southeastern-canonical-inspection": "node scripts/report-southeastern-canonical-inspection.mjs",
     "verify:historical-search": "node scripts/verify-historical-search.mjs"
   },

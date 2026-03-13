@@ -174,6 +174,7 @@ Completed foundation work:
 - a small Southeastern / Kent corridor TIPLOC mapping expansion now exists within that temporary mapping source for a corridor-scoped proof subset only
 - a small corridor coverage step now reads the Darwin resolved-stop inspection JSON, writes a corridor-focused resolved subset, and reports resolved versus unresolved corridor stop counts for later canonical-mapping assessment only
 - a small Southeastern / Kent corridor canonical-mapping proof step now reads that corridor subset, maps only eligible services into canonical-shaped historical service records plus one derived search row each, records explicit exclusions for ineligible services, and writes inspection JSON only without persisting to Supabase
+- a small Southeastern canonical persistence proof step now reads that canonical inspection JSON, validates the eligible `services[]` and `searchRows[]` subset, and persists only the corridor-scoped eligible services into the existing Supabase historical tables using the current rerunnable write path
 - a small Southeastern canonical inspection report step now reads that canonical inspection JSON, aggregates exclusion reasons plus unresolved endpoint TIPLOCs, summarizes the eligible subset by TOC and origin-destination pair, and writes a further report JSON for diagnosis only
 
 Next work remains:
@@ -240,6 +241,15 @@ The current Southeastern / Kent corridor canonical-mapping proof is deliberately
 - awkward cases such as missing endpoint resolution, missing schedule fields, or obvious overnight services are excluded explicitly rather than guessed
 - output is a canonical-shaped inspection JSON file for review only
 - this still does not persist data to Supabase
+
+The current Southeastern canonical persistence proof step is deliberately narrow too:
+
+- input is the existing Southeastern canonical inspection JSON
+- it validates the expected top-level shape and aligned `services[]` plus `searchRows[]` eligible subset
+- it treats canonical `services[]` as the authoritative persistence input
+- it reuses the current historical datastore write path, so reruns remain safe
+- it persists only the current eligible Southeastern / Kent corridor subset into `historical_services` and `historical_service_search`
+- it does not change canonical mapping rules, search logic, routing, HSP behavior, or schema
 
 The current Southeastern canonical inspection report step is deliberately narrow too:
 

@@ -305,6 +305,55 @@ data/derived/darwin-timetable.southeastern-canonical.json
 
 This remains an inspection-only proof step. It maps a corridor-scoped subset into canonical-shaped service and search-row output for review, and does not persist anything to Supabase.
 
+## Southeastern Canonical Persistence Proof
+
+Check-a-Train now also includes a small hosted-Supabase persistence proof for the eligible Southeastern / Kent canonical subset.
+
+- Loader script: [`scripts/load-southeastern-canonical-subset.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/load-southeastern-canonical-subset.mjs)
+- Canonical inspection input: [`data/derived/darwin-timetable.southeastern-canonical.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.southeastern-canonical.json)
+- Persistence helper: [`lib/historical/persistence.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/historical/persistence.mjs)
+
+This proof step:
+
+- reads the existing Southeastern canonical inspection JSON
+- validates the expected top-level shape and the count-aligned `services[]` and `searchRows[]` eligible subset
+- treats `services[]` as the authoritative persistence input
+- reuses the existing historical datastore write path into `historical_services` and `historical_service_search`
+- prints a concise JSON summary showing read and persisted row counts
+
+It still does not:
+
+- change canonical mapping logic or search query logic
+- ingest national data or widen beyond the current Southeastern / Kent subset
+- add routing, HSP behavior, API changes, or UI changes
+
+Required environment variables:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+Run it with the default canonical inspection input:
+
+```bash
+node --env-file=.env.local scripts/load-southeastern-canonical-subset.mjs
+```
+
+Or provide an explicit canonical inspection JSON path:
+
+```bash
+node --env-file=.env.local scripts/load-southeastern-canonical-subset.mjs data/derived/darwin-timetable.southeastern-canonical.json
+```
+
+If those variables are already exported in your shell, you can also use:
+
+```bash
+npm run load:southeastern-canonical-subset
+```
+
+The loader is safe to rerun. It reuses the current persistence semantics: upsert services by `service_key`, reselect affected IDs, delete existing search rows for those service IDs, and recreate one search row per persisted service.
+
 ## Southeastern Canonical Inspection Report
 
 Check-a-Train now also includes a small inspection-only report step over the Southeastern canonical inspection output.
