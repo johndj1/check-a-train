@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "load:historical-services": "node scripts/load-historical-services.mjs",
+    "load:historical-timetable-sample": "node scripts/load-historical-timetable-sample.mjs",
+    "verify:historical-search": "node scripts/verify-historical-search.mjs"
   },
   "dependencies": {
     "next": "^16.1.6",

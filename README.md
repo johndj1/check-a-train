@@ -13,6 +13,116 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Historical Fixture Loader
+
+Check-a-Train includes a tiny fixture-based historical service loader to prove the hosted Supabase datastore write path before real timetable ingestion is added.
+
+- Canonical fixture input lives at [`data/fixtures/historical-services.sample.json`](/Users/danjohn/Projects/Code/check-a-train/data/fixtures/historical-services.sample.json).
+- Loader script lives at [`scripts/load-historical-services.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/load-historical-services.mjs).
+- This is a temporary proof step. The fixture shape is an internal canonical adapter, not the long-term ingestion contract for external rail feeds.
+
+Required environment variables:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+Run the loader with:
+
+```bash
+node --env-file=.env.local scripts/load-historical-services.mjs
+```
+
+If the required environment variables are already exported in your shell, you can also use:
+
+```bash
+npm run load:historical-services
+```
+
+The loader is safe to rerun. It upserts `historical_services` by `service_key`, fetches the affected IDs, deletes existing `historical_service_search` rows for those services, and recreates one search row per service.
+
+## Historical Timetable Sample Loader
+
+Check-a-Train also includes a small timetable-shaped sample loader as the next bridge step between the internal canonical fixture and real external feed ingestion.
+
+- Timetable-shaped sample input lives at [`data/samples/historical-timetable.sample.json`](/Users/danjohn/Projects/Code/check-a-train/data/samples/historical-timetable.sample.json).
+- Mapper module lives at [`lib/historical/timetable-mapper.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/historical/timetable-mapper.mjs).
+- Loader script lives at [`scripts/load-historical-timetable-sample.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/load-historical-timetable-sample.mjs).
+
+This proof step differs from the canonical fixture loader in one important way:
+
+- the sample file is source-like and stop-based, with service identifiers, TOC code, service date, and ordered calling points plus booked times
+- the loader maps that shape into the existing canonical historical service record before persisting it
+- the underlying datastore contract is unchanged: it still writes `historical_services` plus one simple origin-to-destination search row per sample service into `historical_service_search`
+
+Required environment variables:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+Run the timetable-sample loader with:
+
+```bash
+node --env-file=.env.local scripts/load-historical-timetable-sample.mjs
+```
+
+If the required environment variables are already exported in your shell, you can also use:
+
+```bash
+npm run load:historical-timetable-sample
+```
+
+The timetable-sample loader is also safe to rerun. It reuses the same datastore write path as the canonical fixture loader: upsert services by `service_key`, reselect IDs, delete existing search rows for those service IDs, then recreate the search rows.
+
+## Historical Search Proof Path
+
+Check-a-Train now also includes a small server-side historical search proof path that reads from the hosted Supabase datastore.
+
+- Search module: [`lib/historical/search.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/historical/search.mjs)
+- Supabase runtime helper: [`lib/supabase/rest.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/supabase/rest.mjs)
+- Verification script: [`scripts/verify-historical-search.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/verify-historical-search.mjs)
+
+The search path:
+
+- validates and normalizes `originCrs`, `destinationCrs`, `serviceDate`, and `approxDepartureTime`
+- builds a default `±30` minute search window
+- filters `public.historical_service_search` by exact date and CRS pair plus `scheduled_departure_ts` window
+- ranks the filtered rows in application code by closeness to the requested departure time
+- returns a compact candidate list ready for later API use
+
+Required environment variables:
+
+```bash
+SUPABASE_URL=https://your-project-ref.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+```
+
+Run the proof query with:
+
+```bash
+node --env-file=.env.local scripts/verify-historical-search.mjs
+```
+
+Or, if those variables are already exported:
+
+```bash
+npm run verify:historical-search
+```
+
+By default the verification script runs the fixture-backed proof query:
+
+```text
+originCrs=TON
+destinationCrs=SEV
+serviceDate=2026-03-12
+approxDepartureTime=15:45
+```
+
+You can override the query by passing the four arguments in that order.
+
 ## Darwin Live Board Setup
 
 Check-a-Train can call the Rail Data gateway `GetArrDepBoardWithDetails/{crs}` endpoint when `DARWIN_MODE=live`.
