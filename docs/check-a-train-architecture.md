@@ -174,6 +174,7 @@ Completed foundation work:
 - a small Southeastern / Kent corridor TIPLOC mapping expansion now exists within that temporary mapping source for a corridor-scoped proof subset only
 - a small corridor coverage step now reads the Darwin resolved-stop inspection JSON, writes a corridor-focused resolved subset, and reports resolved versus unresolved corridor stop counts for later canonical-mapping assessment only
 - a small Southeastern / Kent corridor canonical-mapping proof step now reads that corridor subset, maps only eligible services into canonical-shaped historical service records plus one derived search row each, records explicit exclusions for ineligible services, and writes inspection JSON only without persisting to Supabase
+- a small Southeastern canonical inspection report step now reads that canonical inspection JSON, aggregates exclusion reasons plus unresolved endpoint TIPLOCs, summarizes the eligible subset by TOC and origin-destination pair, and writes a further report JSON for diagnosis only
 
 Next work remains:
 
@@ -239,6 +240,13 @@ The current Southeastern / Kent corridor canonical-mapping proof is deliberately
 - awkward cases such as missing endpoint resolution, missing schedule fields, or obvious overnight services are excluded explicitly rather than guessed
 - output is a canonical-shaped inspection JSON file for review only
 - this still does not persist data to Supabase
+
+The current Southeastern canonical inspection report step is deliberately narrow too:
+
+- input is the existing Southeastern canonical inspection JSON
+- aggregation is limited to exclusion reasons, unresolved endpoint TIPLOCs, eligible services by TOC, and eligible origin-destination pairs
+- output is a concise report JSON for manual diagnosis of high-leverage mapping gaps
+- this does not change canonical mapping logic or persist anything to Supabase
 
 ---
 

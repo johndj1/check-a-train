@@ -305,6 +305,54 @@ data/derived/darwin-timetable.southeastern-canonical.json
 
 This remains an inspection-only proof step. It maps a corridor-scoped subset into canonical-shaped service and search-row output for review, and does not persist anything to Supabase.
 
+## Southeastern Canonical Inspection Report
+
+Check-a-Train now also includes a small inspection-only report step over the Southeastern canonical inspection output.
+
+- Report script: [`scripts/report-southeastern-canonical-inspection.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/report-southeastern-canonical-inspection.mjs)
+- Canonical inspection input: [`data/derived/darwin-timetable.southeastern-canonical.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.southeastern-canonical.json)
+- Report output: [`data/derived/darwin-timetable.southeastern-canonical.report.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.southeastern-canonical.report.json)
+
+This inspection step:
+
+- reads the existing Southeastern canonical inspection JSON
+- aggregates exclusion counts by reason
+- highlights the most common unresolved origin and destination TIPLOCs
+- summarizes eligible mapped services by TOC and origin-destination pair
+- writes a concise report JSON for manual inspection before any mapping changes
+
+It still does not:
+
+- change canonical mapping rules or expand coverage
+- persist anything to Supabase
+- change search-path, API, routing, HSP, or UI behavior
+
+Run it with the default canonical inspection input:
+
+```bash
+node scripts/report-southeastern-canonical-inspection.mjs
+```
+
+Or provide an explicit canonical inspection JSON path:
+
+```bash
+node scripts/report-southeastern-canonical-inspection.mjs data/derived/darwin-timetable.southeastern-canonical.json
+```
+
+If you prefer the npm script wrapper:
+
+```bash
+npm run report:southeastern-canonical-inspection
+```
+
+The script writes the inspection report file to:
+
+```text
+data/derived/darwin-timetable.southeastern-canonical.report.json
+```
+
+This remains an inspection-only diagnosis step over existing canonical output. It is intended to identify the highest-leverage endpoint mapping gaps and better describe the currently eligible direct-service subset.
+
 ## Historical Search Proof Path
 
 Check-a-Train now also includes a small server-side historical search proof path that reads from the hosted Supabase datastore.
