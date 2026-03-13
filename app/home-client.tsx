@@ -104,6 +104,8 @@ export default function HomeClient() {
   const [debugMode, setDebugMode] = useState(debugFromQuery);
 
   const [services, setServices] = useState<Service[]>([]);
+  const [serviceDetailLoading, setServiceDetailLoading] = useState<Record<string, boolean>>({});
+  const [serviceDetailError, setServiceDetailError] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryableError, setRetryableError] = useState(false);
@@ -150,6 +152,8 @@ export default function HomeClient() {
     setLoading(true);
     setError(null);
     setRetryableError(false);
+    setServiceDetailLoading({});
+    setServiceDetailError({});
     try {
       const res = await fetch(url);
       if (process.env.NODE_ENV === "development") {
@@ -214,6 +218,66 @@ export default function HomeClient() {
       setError("Network error while fetching journeys.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadHistoricalServiceDetails(service: Partial<Service>) {
+    const uid = typeof service.uid === "string" ? service.uid : "";
+    if (!uid || service.providerSource !== "darwin.hsp") return;
+
+    const current = services.find((entry) => entry.uid === uid);
+    if (!current) return;
+    if (current.expectedArrival != null || current.expectedDeparture != null) return;
+    if (serviceDetailLoading[uid]) return;
+
+    setServiceDetailLoading((prev) => ({ ...prev, [uid]: true }));
+    setServiceDetailError((prev) => ({ ...prev, [uid]: null }));
+
+    const url =
+      `/api/journeys/service-details?uid=${encodeURIComponent(uid)}` +
+      `&from=${encodeURIComponent(queryView.fromCode)}` +
+      `&to=${encodeURIComponent(queryView.toCode)}`;
+
+    try {
+      const res = await fetch(url);
+      const raw = await res.text();
+      const isJson = (res.headers.get("content-type") ?? "").includes("application/json");
+      const data = isJson
+        ? (JSON.parse(raw) as {
+            service?: Service;
+            error?: string;
+          })
+        : null;
+
+      if (!res.ok || !data?.service) {
+        const message =
+          data?.error ??
+          (raw.trim().startsWith("<")
+            ? "Service details request returned HTML."
+            : raw.slice(0, 200)) ??
+          "Failed to load service details.";
+        setServiceDetailError((prev) => ({ ...prev, [uid]: message }));
+        return;
+      }
+
+      setServices((prev) =>
+        prev.map((entry) =>
+          entry.uid === uid
+            ? {
+                ...entry,
+                ...data.service,
+                providerSource: entry.providerSource,
+              }
+            : entry,
+        ),
+      );
+    } catch {
+      setServiceDetailError((prev) => ({
+        ...prev,
+        [uid]: "Network error while loading service details.",
+      }));
+    } finally {
+      setServiceDetailLoading((prev) => ({ ...prev, [uid]: false }));
     }
   }
 
@@ -359,6 +423,8 @@ export default function HomeClient() {
     setDate(todayISO());
     setTime(nowHHMM());
     setServices([]);
+    setServiceDetailLoading({});
+    setServiceDetailError({});
     setResultMeta({ source: null, note: null });
     setSubmittedState(false);
     window.history.replaceState({}, "", `/`);
@@ -602,7 +668,13 @@ export default function HomeClient() {
             {services.length > 0 && (
               <div className="mt-4 space-y-3">
                 {services.map((s) => (
-                  <ServiceCard key={s.uid} service={s} />
+                  <ServiceCard
+                    key={s.uid}
+                    service={s}
+                    detailLoading={serviceDetailLoading[s.uid] === true}
+                    detailError={serviceDetailError[s.uid] ?? null}
+                    onExpandDetails={loadHistoricalServiceDetails}
+                  />
                 ))}
               </div>
             )}

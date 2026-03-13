@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Service } from "@/hooks/useJourneySearch";
 
 type ServiceCardProps = {
   service: Partial<Service> | null | undefined;
+  detailLoading?: boolean;
+  detailError?: string | null;
+  onExpandDetails?: (service: Partial<Service>) => void | Promise<void>;
 };
 
 function formatDelay(delayMins: number | null) {
@@ -88,9 +91,29 @@ function eligibilityCopy(service: Partial<Service>) {
   };
 }
 
-export default function ServiceCard({ service }: ServiceCardProps) {
+export default function ServiceCard({
+  service,
+  detailLoading = false,
+  detailError = null,
+  onExpandDetails,
+}: ServiceCardProps) {
   const [expanded, setExpanded] = useState(false);
   const [copyMessage, setCopyMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!expanded || !service || !onExpandDetails) return;
+
+    const needsHistoricalDetailLoad =
+      service.providerSource === "darwin.hsp" &&
+      typeof service.uid === "string" &&
+      service.uid.startsWith("HSP:") &&
+      service.expectedArrival == null &&
+      service.expectedDeparture == null &&
+      !detailError;
+
+    if (!needsHistoricalDetailLoad) return;
+    void onExpandDetails(service);
+  }, [detailError, expanded, onExpandDetails, service]);
 
   if (!service) return null;
 
@@ -176,6 +199,10 @@ export default function ServiceCard({ service }: ServiceCardProps) {
     window.setTimeout(() => setCopyMessage(null), 2000);
   }
 
+  function toggleExpanded() {
+    setExpanded((current) => !current);
+  }
+
   return (
     <article className="rounded-2xl border border-zinc-800 bg-zinc-950 px-4 py-4">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -229,7 +256,7 @@ export default function ServiceCard({ service }: ServiceCardProps) {
 
           <button
             type="button"
-            onClick={() => setExpanded((v) => !v)}
+            onClick={toggleExpanded}
             aria-expanded={expanded}
             aria-controls={`service-details-${uid}`}
             className="rounded-xl border border-zinc-700 px-3 py-2 text-xs text-zinc-200 hover:bg-zinc-800"
@@ -274,6 +301,10 @@ export default function ServiceCard({ service }: ServiceCardProps) {
                 <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
                   Timing evidence
                 </h3>
+                {detailLoading && (
+                  <p className="mt-2 text-xs text-zinc-500">Loading historical service details…</p>
+                )}
+                {detailError && <p className="mt-2 text-xs text-red-300">{detailError}</p>}
                 <dl className="mt-2 space-y-2">
                   <div className="flex items-start justify-between gap-3">
                     <dt className="text-zinc-500">Planned departure</dt>
