@@ -12,6 +12,7 @@
     "parse:darwin-timetable-sample": "node scripts/parse-darwin-timetable-sample.mjs",
     "extract:darwin-candidate-services": "node scripts/extract-darwin-candidate-services.mjs",
     "resolve:darwin-candidate-stops": "node scripts/resolve-darwin-candidate-stops.mjs",
+    "report:southeastern-corridor-coverage": "node scripts/report-southeastern-corridor-coverage.mjs",
     "verify:historical-search": "node scripts/verify-historical-search.mjs"
   },
   "dependencies": {

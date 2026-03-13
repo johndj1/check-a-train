@@ -171,6 +171,8 @@ Completed foundation work:
 - a small Darwin Push Port timetable parser foundation now reads a real `.xml.gz` timetable artefact, extracts a small passenger-service subset into an intermediate normalized JSON inspection model, and deliberately stops before canonical mapping or persistence
 - a small Darwin candidate-service extraction step now reads that parsed JSON inspection output, filters out operational passing points, and writes a cleaner passenger-stop candidate-service JSON model for inspection only
 - a small Darwin TIPLOC stop-resolution foundation now reads the candidate-service JSON, resolves a small explicit subset of TIPLOCs to station-level CRS/name values, and marks unresolved or ambiguous stops explicitly in a further derived inspection file
+- a small Southeastern / Kent corridor TIPLOC mapping expansion now exists within that temporary mapping source for a corridor-scoped proof subset only
+- a small corridor coverage step now reads the Darwin resolved-stop inspection JSON, writes a corridor-focused resolved subset, and reports resolved versus unresolved corridor stop counts for later canonical-mapping assessment only
 
 Next work remains:
 
@@ -215,10 +217,18 @@ The current Darwin TIPLOC stop-resolution proof is deliberately narrow too:
 
 - input is the existing Darwin candidate-service inspection JSON
 - resolution uses a small explicit temporary TIPLOC mapping source for a proof-step subset only
+- the current temporary mapping now includes a small Southeastern / Kent commuter corridor subset to improve inspection coverage in a known corridor
 - unknown TIPLOCs remain unresolved rather than being guessed
 - ambiguous station-area TIPLOCs can be marked explicitly
 - output is a further derived Darwin inspection JSON file with stop-level `resolutionStatus`, `resolvedCrs`, and `resolvedName`
 - no canonical datastore mapping or Supabase persistence happens in this step
+
+The current Southeastern / Kent corridor coverage proof is deliberately narrow as well:
+
+- input is the existing Darwin resolved-stop inspection JSON
+- corridor matching uses a small explicit local rule set based on known corridor TIPLOCs and resolved station names
+- output is a corridor-focused derived inspection JSON plus a concise JSON coverage summary
+- this is still inspection-only and does not perform canonical datastore mapping or Supabase persistence
 
 ---
 

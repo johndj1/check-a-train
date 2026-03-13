@@ -26,6 +26,77 @@
       "resolvedCrs": "EUS",
       "resolvedName": "London Euston"
     },
+    "_southeasternKentComment": "Temporary Southeastern / Kent commuter corridor mappings for corridor-scoped inspection only.",
+    "LNDNBDE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "LBG",
+      "resolvedName": "London Bridge"
+    },
+    "CHRX": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "CHX",
+      "resolvedName": "London Charing Cross"
+    },
+    "VICTRIC": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "VIC",
+      "resolvedName": "London Victoria"
+    },
+    "LEWISHM": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "LEW",
+      "resolvedName": "Lewisham"
+    },
+    "BROMLYS": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BMS",
+      "resolvedName": "Bromley South"
+    },
+    "BROMLYN": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BMN",
+      "resolvedName": "Bromley North"
+    },
+    "ORPNGTN": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "ORP",
+      "resolvedName": "Orpington"
+    },
+    "TONBDG": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "TON",
+      "resolvedName": "Tonbridge"
+    },
+    "OTFORD": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "OTF",
+      "resolvedName": "Otford"
+    },
+    "DARTFD": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "DFD",
+      "resolvedName": "Dartford"
+    },
+    "STROOD": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SOO",
+      "resolvedName": "Strood"
+    },
+    "CHATHAM": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "CTM",
+      "resolvedName": "Chatham"
+    },
+    "RAINHMK": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "RAI",
+      "resolvedName": "Rainham (Kent)"
+    },
+    "FAVRSHM": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "FAV",
+      "resolvedName": "Faversham"
+    },
     "NWCSTLE": {
       "resolutionStatus": "resolved",
       "resolvedCrs": "NCL",

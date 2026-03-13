@@ -211,6 +211,52 @@ data/derived/darwin-timetable.resolved-stops.json
 
 This remains an intermediate proof step only. It is a bridge from TIPLOC-only Darwin candidate services toward later canonical station mapping, not a persistence or search-path change.
 
+## Southeastern / Kent Corridor Coverage
+
+Check-a-Train now also includes a small corridor-focused inspection step on top of the Darwin resolved-stop output.
+
+- Corridor report script: [`scripts/report-southeastern-corridor-coverage.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/report-southeastern-corridor-coverage.mjs)
+- Corridor subset output: [`data/derived/darwin-timetable.southeastern-corridor.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.southeastern-corridor.json)
+
+This step is still intentionally narrow:
+
+- it reads the existing resolved-stop inspection JSON
+- it applies a small explicit Southeastern / Kent commuter corridor rule local to the report script
+- it writes a corridor-focused subset that stays close to the resolved-stop structure
+- it prints a concise coverage summary so the corridor can be judged for later canonical mapping work
+
+It still does not:
+
+- persist Darwin-derived data to Supabase
+- map corridor data into the canonical historical datastore model
+- add live/historical routing, HSP logic, or journey-planning behavior
+
+Run it with the default resolved-stop input:
+
+```bash
+node scripts/report-southeastern-corridor-coverage.mjs
+```
+
+Or provide an explicit resolved-stop JSON path:
+
+```bash
+node scripts/report-southeastern-corridor-coverage.mjs data/derived/darwin-timetable.resolved-stops.json
+```
+
+If you prefer the npm script wrapper:
+
+```bash
+npm run report:southeastern-corridor-coverage
+```
+
+The script writes the corridor-focused inspection file to:
+
+```text
+data/derived/darwin-timetable.southeastern-corridor.json
+```
+
+This remains an intermediate proof step only. It is a corridor-scoped inspection aid for later canonical mapping decisions, not a persistence, search-path, or routing change.
+
 ## Historical Search Proof Path
 
 Check-a-Train now also includes a small server-side historical search proof path that reads from the hosted Supabase datastore.
