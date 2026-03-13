@@ -1,4 +1,4 @@
-import { DarwinTimeoutError, postJson } from "@/lib/darwin/client";
+import { DarwinHttpError, DarwinTimeoutError, postJson } from "@/lib/darwin/client";
 import { rankServicesForJourney } from "@/lib/darwin/match";
 import type {
   DarwinMatchingDiagnostics,
@@ -36,6 +36,8 @@ type HspServiceDetailSummary = {
 
 const DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS = 12000;
 const HSP_SERVICE_DETAILS_TIMEOUT_MS = 12000;
+const DEFAULT_HSP_429_RETRY_DELAY_MS = 1000;
+const HSP_429_MAX_RETRIES = 1;
 const HSP_DEBUG_TIMING_ENABLED =
   process.env.HSP_DEBUG_TIMING === "1" || process.env.NODE_ENV === "development";
 
@@ -49,6 +51,10 @@ const HSP_SERVICE_METRICS_TIMEOUT_MS = parseTimeoutMs(
   process.env.HSP_METRICS_TIMEOUT_MS,
   DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS,
 );
+const HSP_429_RETRY_DELAY_MS = parseTimeoutMs(
+  process.env.HSP_429_RETRY_DELAY_MS,
+  DEFAULT_HSP_429_RETRY_DELAY_MS,
+);
 
 export class HspCredentialsError extends Error {
   constructor(message = "Missing HSP credentials.") {
@@ -60,6 +66,54 @@ export class HspCredentialsError extends Error {
 function hspDebugLog(event: string, payload: Record<string, unknown>) {
   if (!HSP_DEBUG_TIMING_ENABLED) return;
   console.info(`[HSP] ${event}`, payload);
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isHspRateLimited(error: unknown): error is DarwinHttpError {
+  return error instanceof DarwinHttpError && error.status === 429;
+}
+
+function getHsp429RetryDelayMs(attempt: number) {
+  const jitterMultiplier = 0.75 + Math.random() * 0.5;
+  return Math.max(1, Math.floor(HSP_429_RETRY_DELAY_MS * attempt * jitterMultiplier));
+}
+
+async function withHsp429Retry<T>(
+  operation: string,
+  context: Record<string, unknown>,
+  run: () => Promise<T>,
+): Promise<T> {
+  let attempt = 0;
+
+  for (;;) {
+    try {
+      return await run();
+    } catch (error) {
+      if (!isHspRateLimited(error)) {
+        throw error;
+      }
+
+      if (attempt >= HSP_429_MAX_RETRIES) {
+        hspDebugLog(`${operation} rate limited; giving up`, {
+          ...context,
+          attempts: attempt + 1,
+        });
+        throw error;
+      }
+
+      attempt += 1;
+      const retryDelayMs = getHsp429RetryDelayMs(attempt);
+      hspDebugLog(`${operation} rate limited; retrying`, {
+        ...context,
+        attempt,
+        retryDelayMs,
+      });
+      await sleep(retryDelayMs);
+    }
+  }
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -304,13 +358,26 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
   const config = getConfig();
   const startedAt = Date.now();
   try {
-    const payload = await postJson(
-      `${config.baseUrl}/serviceMetrics`,
-      query,
+    const payload = await withHsp429Retry(
+      "serviceMetrics",
       {
-        "x-apikey": config.apiKey,
+        from: query.from_loc,
+        to: query.to_loc,
+        fromDate: query.from_date,
+        toDate: query.to_date,
+        fromTime: query.from_time,
+        toTime: query.to_time,
+        days: query.days,
       },
-      { timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS },
+      () =>
+        postJson(
+          `${config.baseUrl}/serviceMetrics`,
+          query,
+          {
+            "x-apikey": config.apiKey,
+          },
+          { timeoutMs: HSP_SERVICE_METRICS_TIMEOUT_MS },
+        ),
     );
     hspDebugLog("serviceMetrics response", {
       durationMs: Date.now() - startedAt,
@@ -343,11 +410,16 @@ export async function serviceMetrics(query: HspServiceMetricsRequest) {
 
 export async function serviceDetails(rid: string, timeoutMs?: number) {
   const config = getConfig();
-  return postJson(
-    `${config.baseUrl}/serviceDetails`,
-    { rid },
-    { "x-apikey": config.apiKey },
-    timeoutMs ? { timeoutMs } : {},
+  return withHsp429Retry(
+    "serviceDetails",
+    { rid, timeoutMs: timeoutMs ?? null },
+    () =>
+      postJson(
+        `${config.baseUrl}/serviceDetails`,
+        { rid },
+        { "x-apikey": config.apiKey },
+        timeoutMs ? { timeoutMs } : {},
+      ),
   );
 }
 

@@ -50,6 +50,7 @@ When `DARWIN_MODE=live` and `USE_HSP=1`, `/api/journeys` automatically uses Darw
 - Current-day and future searches still use the live Darwin board path.
 - Same-day searches switch to HSP once the requested departure time is at least 45 minutes behind the current time.
 - Past-date searches return the same journey response shape, with `source: "darwin.hsp"` and a historical-source note for the UI.
+- HSP `429` spike-arrest responses are handled with one short delayed retry before the existing controlled error/fallback path is used.
 - HSP is only used to support the existing delay-details outcome; it does not add journey-planning or analytics features.
 
 ### Local Verification
