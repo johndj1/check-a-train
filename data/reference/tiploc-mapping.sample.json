@@ -42,6 +42,16 @@
       "resolvedCrs": "VIC",
       "resolvedName": "London Victoria"
     },
+    "VICTRIE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "VIC",
+      "resolvedName": "London Victoria"
+    },
+    "CANONST": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "CST",
+      "resolvedName": "London Cannon Street"
+    },
     "LEWISHM": {
       "resolutionStatus": "resolved",
       "resolvedCrs": "LEW",
@@ -62,6 +72,16 @@
       "resolvedCrs": "ORP",
       "resolvedName": "Orpington"
     },
+    "SVNOAKS": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SEV",
+      "resolvedName": "Sevenoaks"
+    },
+    "HAYS": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "HYS",
+      "resolvedName": "Hayes (Kent)"
+    },
     "TONBDG": {
       "resolutionStatus": "resolved",
       "resolvedCrs": "TON",
@@ -76,6 +96,16 @@
       "resolutionStatus": "resolved",
       "resolvedCrs": "DFD",
       "resolvedName": "Dartford"
+    },
+    "GRVSEND": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "GRV",
+      "resolvedName": "Gravesend"
+    },
+    "GRVPK": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "GRP",
+      "resolvedName": "Grove Park"
     },
     "STROOD": {
       "resolutionStatus": "resolved",
@@ -96,6 +126,21 @@
       "resolutionStatus": "resolved",
       "resolvedCrs": "FAV",
       "resolvedName": "Faversham"
+    },
+    "RAMSGTE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "RAM",
+      "resolvedName": "Ramsgate"
+    },
+    "DOVERP": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "DVP",
+      "resolvedName": "Dover Priory"
+    },
+    "HASTING": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "HGS",
+      "resolvedName": "Hastings"
     },
     "NWCSTLE": {
       "resolutionStatus": "resolved",
