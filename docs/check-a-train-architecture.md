@@ -168,9 +168,13 @@ Completed foundation work:
 - a small timetable-shaped sample loader now maps source-like stop records into the same canonical historical model and persists them into the existing Supabase tables
 - a small server-side historical search proof path now queries `public.historical_service_search` by exact date, origin CRS, destination CRS, and a buffered scheduled departure window
 - the current proof query ranks candidates in application code by closeness to the requested departure time after indexed database filtering
+- a small Darwin Push Port timetable parser foundation now reads a real `.xml.gz` timetable artefact, extracts a small passenger-service subset into an intermediate normalized JSON inspection model, and deliberately stops before canonical mapping or persistence
+- a small Darwin candidate-service extraction step now reads that parsed JSON inspection output, filters out operational passing points, and writes a cleaner passenger-stop candidate-service JSON model for inspection only
+- a small Darwin TIPLOC stop-resolution foundation now reads the candidate-service JSON, resolves a small explicit subset of TIPLOCs to station-level CRS/name values, and marks unresolved or ambiguous stops explicitly in a further derived inspection file
 
 Next work remains:
 
+- deciding how the Darwin resolved-stop model should later map into the canonical historical datastore shape
 - replacing the temporary sample loaders with real timetable or movement-feed ingestion
 - implementing live versus historical routing
 
@@ -189,6 +193,32 @@ The current timetable-sample proof remains deliberately narrow:
 - mapping into the canonical historical datastore model happens in a small adapter module
 - persistence still targets the existing `historical_services` and `historical_service_search` tables only
 - search row generation is intentionally limited to one origin-to-destination row per service, not full stop-pair expansion
+
+The current Darwin timetable parser proof is also deliberately narrow:
+
+- input is a real Darwin Push Port timetable `.xml.gz` artefact
+- the parser extracts a small inspection-focused subset of journey fields plus ordered timing points
+- passenger-service filtering is explicit and local to the normalization step
+- output is an intermediate Darwin-normalized JSON file for inspection only
+- no Supabase persistence or canonical historical datastore mapping happens in this step
+
+The current Darwin candidate-service extraction proof is deliberately narrow as well:
+
+- input is the existing Darwin-normalized JSON inspection file
+- it keeps only likely passenger stop kinds: `OR`, `IP`, and `DT`
+- it excludes operational passing points with kind `PP`
+- it preserves TIPLOCs and preferred scheduled arrival/departure fields as-is
+- output is a second intermediate candidate-service JSON file for inspection only
+- no CRS mapping, canonical datastore mapping, or Supabase persistence happens in this step
+
+The current Darwin TIPLOC stop-resolution proof is deliberately narrow too:
+
+- input is the existing Darwin candidate-service inspection JSON
+- resolution uses a small explicit temporary TIPLOC mapping source for a proof-step subset only
+- unknown TIPLOCs remain unresolved rather than being guessed
+- ambiguous station-area TIPLOCs can be marked explicitly
+- output is a further derived Darwin inspection JSON file with stop-level `resolutionStatus`, `resolvedCrs`, and `resolvedName`
+- no canonical datastore mapping or Supabase persistence happens in this step
 
 ---
 

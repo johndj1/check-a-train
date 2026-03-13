@@ -77,6 +77,140 @@ npm run load:historical-timetable-sample
 
 The timetable-sample loader is also safe to rerun. It reuses the same datastore write path as the canonical fixture loader: upsert services by `service_key`, reselect IDs, delete existing search rows for those service IDs, then recreate the search rows.
 
+## Darwin Timetable Parser Foundation
+
+Check-a-Train now also includes a small parser foundation for a real Darwin Push Port timetable XML artefact in `.xml.gz` form.
+
+- Parser module: [`lib/darwin/timetable-parser.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/darwin/timetable-parser.mjs)
+- Parse script: [`scripts/parse-darwin-timetable-sample.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/parse-darwin-timetable-sample.mjs)
+- Derived inspection output: [`data/derived/darwin-timetable.parsed.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.parsed.json)
+
+This step is intentionally narrow:
+
+- it reads and decompresses a Darwin timetable `.xml.gz` file
+- it extracts a small subset of journey fields plus ordered timing points
+- it filters out non-passenger services when `isPassengerSvc` is explicitly present and false
+- it writes an intermediate normalized inspection model only
+
+It does not:
+
+- persist real Darwin timetable data to Supabase
+- map directly into the canonical historical datastore model
+- add movement enrichment, HSP logic, or routing changes
+
+Run it with an explicit input path:
+
+```bash
+node scripts/parse-darwin-timetable-sample.mjs /absolute/or/relative/path/to/darwin-timetable.xml.gz
+```
+
+Or, if you prefer the npm script wrapper:
+
+```bash
+npm run parse:darwin-timetable-sample -- /absolute/or/relative/path/to/darwin-timetable.xml.gz
+```
+
+The script writes a normalized JSON inspection file to:
+
+```text
+data/derived/darwin-timetable.parsed.json
+```
+
+## Darwin Candidate-Service Extraction
+
+Check-a-Train now also includes a small follow-on step that derives a cleaner, inspection-focused candidate-service model from the parsed Darwin timetable JSON.
+
+- Candidate-service helper: [`lib/darwin/candidate-services.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/darwin/candidate-services.mjs)
+- Extraction script: [`scripts/extract-darwin-candidate-services.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/extract-darwin-candidate-services.mjs)
+- Derived candidate-service output: [`data/derived/darwin-timetable.candidate-services.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.candidate-services.json)
+
+This step is still intentionally narrow:
+
+- it reads the existing Darwin parsed inspection JSON as its input contract
+- it keeps only likely passenger stop timing points with kinds `OR`, `IP`, and `DT`
+- it excludes operational passing points with kind `PP`
+- it preserves TIPLOC values and the already-derived scheduled arrival/departure fields
+- it writes a smaller candidate-service inspection model only
+
+It still does not:
+
+- perform CRS or TIPLOC resolution
+- map into the canonical historical datastore model
+- persist Darwin-derived data to Supabase
+
+Run it with the default parsed Darwin input:
+
+```bash
+node scripts/extract-darwin-candidate-services.mjs
+```
+
+Or provide an explicit parsed Darwin JSON path:
+
+```bash
+node scripts/extract-darwin-candidate-services.mjs data/derived/darwin-timetable.parsed.json
+```
+
+If you prefer the npm script wrapper:
+
+```bash
+npm run extract:darwin-candidate-services
+```
+
+The script writes the derived candidate-service inspection file to:
+
+```text
+data/derived/darwin-timetable.candidate-services.json
+```
+
+## Darwin TIPLOC Stop Resolution
+
+Check-a-Train now also includes a small Darwin-only TIPLOC stop-resolution proof step on top of the candidate-service JSON.
+
+- Resolution helper: [`lib/darwin/tiploc-resolution.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/darwin/tiploc-resolution.mjs)
+- Temporary mapping source: [`data/reference/tiploc-mapping.sample.json`](/Users/danjohn/Projects/Code/check-a-train/data/reference/tiploc-mapping.sample.json)
+- Resolution script: [`scripts/resolve-darwin-candidate-stops.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/resolve-darwin-candidate-stops.mjs)
+- Derived resolved-stop output: [`data/derived/darwin-timetable.resolved-stops.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.resolved-stops.json)
+
+This step is still intentionally narrow:
+
+- it reads the existing Darwin candidate-service inspection JSON
+- it applies a small explicit TIPLOC mapping for a useful proof-step subset only
+- it augments each stop with `resolutionStatus`, `resolvedCrs`, and `resolvedName`
+- it leaves unknown TIPLOCs unresolved rather than guessing
+- it can also mark stops as ambiguous or excluded when that is explicit
+
+It still does not:
+
+- map Darwin stops into the canonical historical datastore model
+- persist Darwin-derived data to Supabase
+- add routing, HSP fallback, or journey-planning logic
+
+Run it with the default candidate-service input:
+
+```bash
+node scripts/resolve-darwin-candidate-stops.mjs
+```
+
+Or provide an explicit candidate-service JSON path:
+
+```bash
+node scripts/resolve-darwin-candidate-stops.mjs data/derived/darwin-timetable.candidate-services.json
+```
+
+If you prefer the npm script wrapper:
+
+```bash
+npm run resolve:darwin-candidate-stops
+```
+
+The script writes the resolved-stop inspection file to:
+
+```text
+data/derived/darwin-timetable.resolved-stops.json
+```
+
+This remains an intermediate proof step only. It is a bridge from TIPLOC-only Darwin candidate services toward later canonical station mapping, not a persistence or search-path change.
+
 ## Historical Search Proof Path
 
 Check-a-Train now also includes a small server-side historical search proof path that reads from the hosted Supabase datastore.

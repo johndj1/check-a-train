@@ -9,9 +9,13 @@
     "lint": "eslint",
     "load:historical-services": "node scripts/load-historical-services.mjs",
     "load:historical-timetable-sample": "node scripts/load-historical-timetable-sample.mjs",
+    "parse:darwin-timetable-sample": "node scripts/parse-darwin-timetable-sample.mjs",
+    "extract:darwin-candidate-services": "node scripts/extract-darwin-candidate-services.mjs",
+    "resolve:darwin-candidate-stops": "node scripts/resolve-darwin-candidate-stops.mjs",
     "verify:historical-search": "node scripts/verify-historical-search.mjs"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.5.5",
     "next": "^16.1.6",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"

@@ -1,0 +1,130 @@
+{
+  "_comment": "Temporary proof-step TIPLOC mapping for Darwin candidate stop resolution only. Keep this file small, explicit, and easy to inspect.",
+  "entries": {
+    "MNCRPIC": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "MAN",
+      "resolvedName": "Manchester Piccadilly"
+    },
+    "STKP": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SPT",
+      "resolvedName": "Stockport"
+    },
+    "STOKEOT": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SOT",
+      "resolvedName": "Stoke-on-Trent"
+    },
+    "NNTN": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "NMP",
+      "resolvedName": "Northampton"
+    },
+    "EUSTON": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "EUS",
+      "resolvedName": "London Euston"
+    },
+    "NWCSTLE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "NCL",
+      "resolvedName": "Newcastle"
+    },
+    "CLST": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "CLS",
+      "resolvedName": "Chester-le-Street"
+    },
+    "DRHM": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "DHM",
+      "resolvedName": "Durham"
+    },
+    "DLTN": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "DAR",
+      "resolvedName": "Darlington"
+    },
+    "LESTER": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "LEI",
+      "resolvedName": "Leicester"
+    },
+    "SYSTON": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SYS",
+      "resolvedName": "Syston"
+    },
+    "SILEBY": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SIL",
+      "resolvedName": "Sileby"
+    },
+    "BAROWOS": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BWS",
+      "resolvedName": "Barrow-upon-Soar"
+    },
+    "LOGHBRO": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "LBO",
+      "resolvedName": "Loughborough"
+    },
+    "EMPKWAY": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "EMD",
+      "resolvedName": "East Midlands Parkway"
+    },
+    "ATNBRO": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "ATT",
+      "resolvedName": "Attenborough"
+    },
+    "BESTON": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BES",
+      "resolvedName": "Beeston"
+    },
+    "NTNG": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "NOT",
+      "resolvedName": "Nottingham"
+    },
+    "POOLE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "POO",
+      "resolvedName": "Poole"
+    },
+    "PSTONE": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "PKN",
+      "resolvedName": "Parkstone"
+    },
+    "BRANKSM": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BSM",
+      "resolvedName": "Branksome"
+    },
+    "BOMO": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "BMH",
+      "resolvedName": "Bournemouth"
+    },
+    "STFD": {
+      "resolutionStatus": "resolved",
+      "resolvedCrs": "SRA",
+      "resolvedName": "Stratford"
+    },
+    "CLPHMJ1": {
+      "resolutionStatus": "ambiguous",
+      "resolvedCrs": null,
+      "resolvedName": "Clapham Junction area"
+    },
+    "WLSDJHL": {
+      "resolutionStatus": "ambiguous",
+      "resolvedCrs": null,
+      "resolvedName": "Willesden Junction area"
+    }
+  }
+}
