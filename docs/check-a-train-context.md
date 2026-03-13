@@ -3,16 +3,16 @@
 ## Product summary
 Check-a-Train is being built as a Delay Repay assistant MVP. Its purpose is to help a user quickly understand whether a train service was delayed and hand them off cleanly to the correct operator claim path.
 
-It is not currently intended to be a full journey planner.
+It is not currently intended to be a full journey planner. In MVP, the product focuses on direct-service identification, delay evidence, and operator claim handoff after or near the time of travel.
 
 ## Core user problem
 Users often know roughly which train they took, but they do not want to manually piece together live running, historic service data, operator ownership, and Delay Repay eligibility rules. The app should reduce friction from “what happened to my train?” to “I know whether I can claim, and where to go next.”
 
 ## MVP outcome
 A user should be able to:
-1. search for a relevant service
+1. search for a relevant service from station and timing context
 2. inspect enough service detail to confirm they have the right train
-3. see delay status / likely eligibility signal
+3. see a clear delay status and likely claim signal
 4. be handed off to the right operator claim path
 
 ## Current phase priorities
@@ -28,6 +28,7 @@ A user should be able to:
 
 ### Phase C
 - add stronger arrival-based delay using Darwin / live running information
+- keep the delay basis explainable in UI and API responses
 
 ### Deferred for later
 - full journey planning
@@ -61,7 +62,7 @@ A user should be able to:
 ## Key journeys
 
 ### Journey 1: check a recent service
-User searches by station / service context, finds the relevant service, and sees whether it appears delayed.
+User searches by station and service context, finds the relevant direct service, and sees whether it appears delayed.
 
 ### Journey 2: confirm the correct train
 User expands a service and checks timing / calling points to confirm identity.
@@ -81,10 +82,17 @@ The app continues to use its existing shape:
 - hosted Supabase for historical indexed search
 - narrow persistence proof for already-mapped canonical subsets
 
-One active example is persisting `services[]` from:
-- `data/derived/darwin-timetable.southeastern-canonical.json`
+One active example is a narrow canonical subset persistence proof that validates:
+- approved `services[]` records
+- aligned `searchRows[]` records for indexed historical lookup
 
-This persistence work should validate `searchRows[]` while preserving current persistence semantics.
+This persistence work should validate `searchRows[]` while preserving current persistence semantics and avoiding broader schema churn.
+
+## Delivery bias
+- prefer thin, implementation-ready tasks
+- keep changes low-blast-radius and easy to review
+- preserve current live versus historical semantics unless a task explicitly changes them
+- keep documentation practical enough that Codex can act with minimal manual restating
 
 ## Non-goals
 - becoming a generic train planning app in MVP

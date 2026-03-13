@@ -3,8 +3,11 @@
 ## Status
 Backlog
 
-## Related feature
+## Parent feature
 <Feature name>
+
+## Intended outcome
+<What user-facing or delivery outcome this task unlocks>
 
 ## Persona
 <Persona supported>
@@ -12,33 +15,26 @@ Backlog
 ## Journey
 <Journey supported>
 
-## Why
-<Why this task matters now>
+## Context
+<Short product and technical context for this slice>
 
-## User value
-<What gets easier, clearer, or faster for the user>
-
-## In scope
+## Scope
 - <item>
 - <item>
 
-## Out of scope
+## Constraints
 - <item>
 - <item>
-
-## Relevant files / systems
-- `<path or system>`
-- `<path or system>`
 
 ## Acceptance criteria
 - [ ] <testable condition>
 - [ ] <testable condition>
 - [ ] <testable condition>
 
+## Implementation notes
+- <relevant file, system, or data source>
+- <important implementation note or assumption>
+
 ## Validation
 - <manual or automated validation step>
 - <manual or automated validation step>
-
-## Delivery notes
-- <important implementation note>
-- <constraint or assumption>

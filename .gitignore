@@ -44,3 +44,6 @@ next-env.d.ts
 # local env (secrets)
 .env.local
 .env.*.local
+
+#Agent BUilder
+tasks/active/*

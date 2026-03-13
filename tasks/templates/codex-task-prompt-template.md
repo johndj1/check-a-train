@@ -3,6 +3,7 @@
 Read the following before making changes:
 - `AGENTS.md`
 - `docs/check-a-train-context.md`
+- `docs/product-sources.md`
 - `docs/feature-delivery-system.md`
 - the active task file
 
@@ -12,6 +13,8 @@ You may inspect repository files before making changes.
 Implement the active task in the smallest safe way.
 Preserve current behaviour unless the task explicitly changes it.
 Do not broaden scope beyond the task.
+Keep Check-a-Train positioned as a Delay Repay assistant MVP, not a journey planner.
+Be explicit about persistence and live-running assumptions when they matter.
 Run relevant validation if available.
 
 ## Output format

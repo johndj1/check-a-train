@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "ai-task": "bash scripts/run-ai-task.sh",
+    "ai-batch": "bash scripts/run-ai-batch.sh",
+    "dev-loop": "bash scripts/run-ai-dev-loop.sh",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",

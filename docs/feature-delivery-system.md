@@ -7,6 +7,10 @@ Persona -> Journey -> Outcome -> Feature -> Task -> Code -> Review -> Commit
 
 This file defines how backlog items should be shaped so an agent can pick them up with minimal manual translation.
 
+Primary grounding lives in:
+- `docs/check-a-train-context.md`
+- `docs/product-sources.md`
+
 ## Rule 1: Features are outcome-led
 Every feature should state:
 - who it is for
@@ -29,14 +33,14 @@ A task file should be sufficient for an implementation agent to:
 ## Standard task anatomy
 Each task should include:
 - Title
-- Why
-- User value
-- In scope
-- Out of scope
-- Relevant files / systems
+- Parent feature
+- Intended outcome
+- Context
+- Scope
+- Constraints
 - Acceptance criteria
+- Implementation notes
 - Validation
-- Delivery notes
 
 ## Backlog flow
 Use folders like this:
@@ -51,6 +55,8 @@ Suggested flow:
 4. Review diff and validation
 5. Commit and move task to `tasks/done/`
 
+Only one active task should normally exist at a time unless a human explicitly wants parallel work.
+
 ## AI generation rules
 When generating tasks from product docs, always:
 1. map back to persona and journey
@@ -59,6 +65,8 @@ When generating tasks from product docs, always:
 4. include acceptance criteria that are testable
 5. include assumptions explicitly
 6. preserve current MVP boundaries
+7. keep wording practical enough that the task can be executed without manual proxying
+8. prefer low-blast-radius changes over broad refactors
 
 ## Example feature decomposition
 

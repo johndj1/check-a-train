@@ -9,6 +9,7 @@ The user is the Product Owner. Product intent is defined in the product document
 
 1. Read the grounding docs before making changes:
    - `docs/check-a-train-context.md`
+   - `docs/product-sources.md`
    - `docs/feature-delivery-system.md`
    - any task file in `tasks/active/`
 2. You may inspect repository files before making changes.
@@ -42,6 +43,12 @@ Current prioritisation:
 - Phase C: add arrival-based delay using Darwin/live running data
 - Journey planning is deferred
 
+For canonical product intent, prefer:
+- `docs/check-a-train-context.md` for personas, journeys, and MVP boundaries
+- `docs/product-sources.md` for source mapping
+- `docs/feature-delivery-system.md` for task shape and delivery flow
+- feature-specific docs under `docs/features/` when a task maps directly to one
+
 ## Architecture guardrails
 Current expected architecture:
 - Next.js application
@@ -60,7 +67,7 @@ Preferred workflow:
 1. A task exists as a markdown file in `tasks/active/`
 2. Read task + grounding docs
 3. Inspect relevant code
-4. Implement on a fresh feature branch
+4. Implement on the current working branch unless the user explicitly asks for branch setup
 5. Run available validation
 6. Summarise the diff in plain English
 7. Move or propose moving the task to `tasks/done/` when complete

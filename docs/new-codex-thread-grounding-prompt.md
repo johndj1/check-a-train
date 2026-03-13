@@ -7,6 +7,7 @@ Use this when starting a fresh Codex thread for Check-a-Train.
 Read these files before making changes:
 - `AGENTS.md`
 - `docs/check-a-train-context.md`
+- `docs/product-sources.md`
 - `docs/feature-delivery-system.md`
 - the task file currently in `tasks/active/`
 
@@ -18,6 +19,10 @@ Persona -> Journey -> Outcome -> Feature -> Task -> Code.
 Important:
 - Check-a-Train is a Delay Repay assistant MVP, not a full journey planner.
 - Preserve current MVP scope.
+- Respect the current phase ordering:
+  - Phase A: station departures + derive delay + operator claim handoff
+  - Phase B: fetch `service_timetable` on expand to confirm calling points
+  - Phase C: add arrival-based delay using Darwin/live running data
 - Prefer the smallest safe implementation.
 - Do not introduce speculative scope.
 - Protect existing persistence semantics unless the task explicitly changes them.
