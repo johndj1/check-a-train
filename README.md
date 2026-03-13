@@ -257,6 +257,54 @@ data/derived/darwin-timetable.southeastern-corridor.json
 
 This remains an intermediate proof step only. It is a corridor-scoped inspection aid for later canonical mapping decisions, not a persistence, search-path, or routing change.
 
+## Southeastern Corridor Canonical Mapping Proof
+
+Check-a-Train now also includes a small inspection-only mapper from the Southeastern / Kent corridor subset into the existing canonical historical model shape.
+
+- Canonical mapper: [`lib/historical/darwin-corridor-canonical-mapper.mjs`](/Users/danjohn/Projects/Code/check-a-train/lib/historical/darwin-corridor-canonical-mapper.mjs)
+- Mapping script: [`scripts/map-southeastern-corridor-to-canonical.mjs`](/Users/danjohn/Projects/Code/check-a-train/scripts/map-southeastern-corridor-to-canonical.mjs)
+- Canonical inspection output: [`data/derived/darwin-timetable.southeastern-canonical.json`](/Users/danjohn/Projects/Code/check-a-train/data/derived/darwin-timetable.southeastern-canonical.json)
+
+This proof step:
+
+- reads the existing corridor-focused resolved Darwin JSON
+- maps only eligible services into canonical-shaped historical service records
+- derives one canonical-shaped search row per eligible service
+- records excluded services explicitly with clear reason codes
+- writes inspection JSON only for review before any later persistence step
+
+It still does not:
+
+- persist Darwin-derived data to Supabase
+- add movement enrichment, stop-pair generation, or journey-planning behavior
+- change live/historical routing, HSP usage, or API behavior
+
+Run it with the default corridor input:
+
+```bash
+node scripts/map-southeastern-corridor-to-canonical.mjs
+```
+
+Or provide an explicit corridor JSON path:
+
+```bash
+node scripts/map-southeastern-corridor-to-canonical.mjs data/derived/darwin-timetable.southeastern-corridor.json
+```
+
+If you prefer the npm script wrapper:
+
+```bash
+npm run map:southeastern-canonical
+```
+
+The script writes the canonical inspection file to:
+
+```text
+data/derived/darwin-timetable.southeastern-canonical.json
+```
+
+This remains an inspection-only proof step. It maps a corridor-scoped subset into canonical-shaped service and search-row output for review, and does not persist anything to Supabase.
+
 ## Historical Search Proof Path
 
 Check-a-Train now also includes a small server-side historical search proof path that reads from the hosted Supabase datastore.

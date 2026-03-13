@@ -173,6 +173,7 @@ Completed foundation work:
 - a small Darwin TIPLOC stop-resolution foundation now reads the candidate-service JSON, resolves a small explicit subset of TIPLOCs to station-level CRS/name values, and marks unresolved or ambiguous stops explicitly in a further derived inspection file
 - a small Southeastern / Kent corridor TIPLOC mapping expansion now exists within that temporary mapping source for a corridor-scoped proof subset only
 - a small corridor coverage step now reads the Darwin resolved-stop inspection JSON, writes a corridor-focused resolved subset, and reports resolved versus unresolved corridor stop counts for later canonical-mapping assessment only
+- a small Southeastern / Kent corridor canonical-mapping proof step now reads that corridor subset, maps only eligible services into canonical-shaped historical service records plus one derived search row each, records explicit exclusions for ineligible services, and writes inspection JSON only without persisting to Supabase
 
 Next work remains:
 
@@ -229,6 +230,15 @@ The current Southeastern / Kent corridor coverage proof is deliberately narrow a
 - corridor matching uses a small explicit local rule set based on known corridor TIPLOCs and resolved station names
 - output is a corridor-focused derived inspection JSON plus a concise JSON coverage summary
 - this is still inspection-only and does not perform canonical datastore mapping or Supabase persistence
+
+The current Southeastern / Kent corridor canonical-mapping proof is deliberately narrow too:
+
+- input is the existing corridor-focused resolved Darwin inspection JSON
+- only services with valid endpoint CRS values plus usable origin departure and destination arrival schedule times are mapped
+- mapping reuses the current canonical historical service field shape and derives one origin-to-destination search row per eligible service
+- awkward cases such as missing endpoint resolution, missing schedule fields, or obvious overnight services are excluded explicitly rather than guessed
+- output is a canonical-shaped inspection JSON file for review only
+- this still does not persist data to Supabase
 
 ---
 

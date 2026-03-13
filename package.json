@@ -13,6 +13,7 @@
     "extract:darwin-candidate-services": "node scripts/extract-darwin-candidate-services.mjs",
     "resolve:darwin-candidate-stops": "node scripts/resolve-darwin-candidate-stops.mjs",
     "report:southeastern-corridor-coverage": "node scripts/report-southeastern-corridor-coverage.mjs",
+    "map:southeastern-canonical": "node scripts/map-southeastern-corridor-to-canonical.mjs",
     "verify:historical-search": "node scripts/verify-historical-search.mjs"
   },
   "dependencies": {
