@@ -80,7 +80,6 @@ export type HspServicesParams = {
   date: string;
   time: string;
   windowMins: number;
-  detailsLimit?: number;
 };
 
 export type HspServiceMetricsRequest = {

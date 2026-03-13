@@ -36,7 +36,6 @@ type HspServiceDetailSummary = {
 
 const DEFAULT_HSP_SERVICE_METRICS_TIMEOUT_MS = 12000;
 const HSP_SERVICE_DETAILS_TIMEOUT_MS = 12000;
-const HSP_MVP_DETAILS_LIMIT = 1;
 const HSP_DEBUG_TIMING_ENABLED =
   process.env.HSP_DEBUG_TIMING === "1" || process.env.NODE_ENV === "development";
 
@@ -352,11 +351,6 @@ export async function serviceDetails(rid: string, timeoutMs?: number) {
   );
 }
 
-function clampPositiveInt(value: number, min: number, max: number) {
-  if (!Number.isFinite(value)) return min;
-  return Math.min(Math.max(Math.floor(value), min), max);
-}
-
 async function loadHspServiceDetailSummary(
   rid: string,
   params: Pick<HspServicesParams, "from" | "to">,
@@ -416,68 +410,76 @@ async function loadHspServiceDetailSummary(
   };
 }
 
-async function enrichSelectedHspServices(
-  services: DarwinNormalizedService[],
-  params: HspServicesParams,
-  detailUidSet: Set<string>,
+function buildBaseHspServices(metrics: HspServiceMetric[], params: HspServicesParams): DarwinNormalizedService[] {
+  return metrics.map((metric, idx) => ({
+    uid: `HSP:${metric.rid}`,
+    operator: metric.tocCode,
+    operatorName: metric.tocCode ?? "Unknown",
+    claimUrl: null,
+    platform: null,
+    originName: params.from.toUpperCase(),
+    destinationName: params.to.toUpperCase(),
+    aimedDeparture: toHHMM(metric.gbttPtd),
+    expectedDeparture: null,
+    aimedArrival: "",
+    expectedArrival: null,
+    delayMins: null,
+    status: "Unknown",
+    callsAtTo: undefined,
+    _timetableId: metric.rid ?? `hsp-${idx}`,
+  }));
+}
+
+export async function enrichHspService(
+  service: DarwinNormalizedService,
+  params: Pick<HspServicesParams, "from" | "to">,
 ) {
-  if (detailUidSet.size === 0 || services.length === 0) {
-    return services;
+  const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
+  if (!rid) {
+    return service;
   }
 
-  const results = [...services];
-  for (const [index, service] of services.entries()) {
-    if (!detailUidSet.has(service.uid)) {
-      continue;
-    }
+  try {
+    const detail = await loadHspServiceDetailSummary(rid, params);
 
-    const rid = service.uid.startsWith("HSP:") ? service.uid.slice(4) : null;
-    if (!rid) {
-      continue;
-    }
-
-    try {
-      const detail = await loadHspServiceDetailSummary(rid, params);
-
-      results[index] = {
-        ...service,
-        aimedDeparture: detail.aimedDeparture ?? service.aimedDeparture,
-        expectedDeparture: detail.expectedDeparture,
-        aimedArrival: detail.aimedArrival,
-        expectedArrival: detail.expectedArrival,
-        delayMins: detail.delayMins,
-        status: detail.status,
-        callsAtTo: detail.callsAtTo,
-        rawStatusText: detail.rawStatusText,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      if (process.env.NODE_ENV === "development") {
-        if (error instanceof DarwinTimeoutError) {
-          console.warn("[HSP] serviceDetails timed out", {
-            rid,
-            from: params.from,
-            to: params.to,
-            timeoutMs: HSP_SERVICE_DETAILS_TIMEOUT_MS,
-          });
-        } else {
-          console.warn("[HSP] serviceDetails failed", {
-            rid,
-            from: params.from,
-            to: params.to,
-            message,
-          });
-        }
-        console.info("[HSP] falling back to base service", {
+    return {
+      ...service,
+      aimedDeparture: detail.aimedDeparture ?? service.aimedDeparture,
+      expectedDeparture: detail.expectedDeparture,
+      aimedArrival: detail.aimedArrival,
+      expectedArrival: detail.expectedArrival,
+      delayMins: detail.delayMins,
+      status: detail.status,
+      callsAtTo: detail.callsAtTo,
+      rawStatusText: detail.rawStatusText,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown error";
+    if (process.env.NODE_ENV === "development") {
+      if (error instanceof DarwinTimeoutError) {
+        console.warn("[HSP] serviceDetails timed out", {
           rid,
-          uid: service.uid,
           from: params.from,
           to: params.to,
+          timeoutMs: HSP_SERVICE_DETAILS_TIMEOUT_MS,
+        });
+      } else {
+        console.warn("[HSP] serviceDetails failed", {
+          rid,
+          from: params.from,
+          to: params.to,
+          message,
         });
       }
+      console.info("[HSP] falling back to base service", {
+        rid,
+        uid: service.uid,
+        from: params.from,
+        to: params.to,
+      });
     }
+    return service;
   }
-  return results;
 }
 
 export async function fetchHspServices(params: HspServicesParams) {
@@ -498,7 +500,6 @@ export async function fetchHspServices(params: HspServicesParams) {
     fromTime,
     toTime,
     dayType,
-    detailsLimit: params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT,
   });
 
   const metricsPayload = await serviceMetrics({
@@ -519,36 +520,7 @@ export async function fetchHspServices(params: HspServicesParams) {
     requestedTime: params.time,
     rawServiceCount: metrics.length,
   });
-  const baseServices: DarwinNormalizedService[] = metrics.map((metric, idx) => ({
-    uid: `HSP:${metric.rid}`,
-    operator: metric.tocCode,
-    operatorName: metric.tocCode ?? "Unknown",
-    claimUrl: null,
-    platform: null,
-    originName: params.from.toUpperCase(),
-    destinationName: params.to.toUpperCase(),
-    aimedDeparture: toHHMM(metric.gbttPtd),
-    expectedDeparture: null,
-    aimedArrival: "",
-    expectedArrival: null,
-    delayMins: null,
-    status: "Unknown",
-    callsAtTo: undefined,
-    _timetableId: metric.rid ?? `hsp-${idx}`,
-  }));
-
-  const detailsLimit = clampPositiveInt(params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT, 0, HSP_MVP_DETAILS_LIMIT);
-  const detailUidSet = new Set(baseServices.slice(0, detailsLimit).map((service) => service.uid));
-  hspDebugLog("fetchHspServices enrichment plan", {
-    from: params.from,
-    to: params.to,
-    date: params.date,
-    requestedTime: params.time,
-    baseServiceCount: baseServices.length,
-    detailsLimit,
-    enrichmentRidCount: detailUidSet.size,
-  });
-  const services = await enrichSelectedHspServices(baseServices, params, detailUidSet);
+  const services = buildBaseHspServices(metrics, params);
 
   hspDebugLog("fetchHspServices completed", {
     from: params.from,
@@ -557,8 +529,7 @@ export async function fetchHspServices(params: HspServicesParams) {
     requestedTime: params.time,
     durationMs: Date.now() - startedAt,
     rawServiceCount: metrics.length,
-    enrichedServiceCount: services.length,
-    detailsAttempted: detailUidSet.size,
+    candidateServiceCount: services.length,
   });
 
   return {
@@ -587,20 +558,11 @@ export async function fetchHspJourneys(params: HspServicesParams) {
     windowMins: params.windowMins,
   });
 
-  const base = await fetchHspServices({ ...params, detailsLimit: 0 });
-  const preRanked = rankServicesForJourney(base.services, { time: requestedTime });
-  const detailsLimit = clampPositiveInt(
-    params.detailsLimit ?? HSP_MVP_DETAILS_LIMIT,
-    0,
-    Math.min(HSP_MVP_DETAILS_LIMIT, Math.max(preRanked.services.length, 0)),
-  );
-  const detailUidSet = new Set(preRanked.services.slice(0, detailsLimit).map((service) => service.uid));
-  const enriched = await enrichSelectedHspServices(preRanked.services, params, detailUidSet);
-
-  const matched = rankServicesForJourney(enriched, { time: requestedTime });
-  const destinationConfirmedCount = enriched.filter((service) => service.callsAtTo === true).length;
-  const destinationMismatchCount = enriched.filter((service) => service.callsAtTo === false).length;
-  const destinationUnknownCount = enriched.filter((service) => service.callsAtTo == null).length;
+  const base = await fetchHspServices(params);
+  const matched = rankServicesForJourney(base.services, { time: requestedTime });
+  const destinationConfirmedCount = matched.services.filter((service) => service.callsAtTo === true).length;
+  const destinationMismatchCount = matched.services.filter((service) => service.callsAtTo === false).length;
+  const destinationUnknownCount = matched.services.filter((service) => service.callsAtTo == null).length;
   const diagnostics: DarwinMatchingDiagnostics = {
     requestedTime,
     windowMins: params.windowMins,
@@ -614,7 +576,7 @@ export async function fetchHspJourneys(params: HspServicesParams) {
     destinationConfirmedCount,
     destinationMismatchCount,
     destinationUnknownCount,
-    normalizedServiceSample: enriched.slice(0, 3).map((service) => ({
+    normalizedServiceSample: matched.services.slice(0, 3).map((service) => ({
       uid: service.uid,
       destinationName: service.destinationName,
       aimedDeparture: service.aimedDeparture,
@@ -632,9 +594,7 @@ export async function fetchHspJourneys(params: HspServicesParams) {
     windowMins: params.windowMins,
     durationMs: Date.now() - startedAt,
     rawServiceCount: base.rawCount,
-    normalizedServiceCount: enriched.length,
-    detailsLimit,
-    detailsAttempted: detailUidSet.size,
+    normalizedServiceCount: matched.services.length,
     topCandidates: matched.services.slice(0, 3).map((service) => ({
       uid: service.uid,
       matchScore: service.matchScore ?? null,
@@ -651,6 +611,6 @@ export async function fetchHspJourneys(params: HspServicesParams) {
     diagnostics,
     source: "darwin.hsp",
     note:
-      "Using Darwin HSP historical service performance data for a past-date search. Services are matched by route and ranked around the searched departure time.",
+      "Using Darwin HSP historical service performance metrics for a past-date search. Candidate services are matched by route and ranked around the searched departure time.",
   };
 }

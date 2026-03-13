@@ -67,7 +67,7 @@ Expected verification points:
 
 - The JSON response includes `source: "darwin.hsp"`.
 - `note` explains that historical HSP data was used.
-- Returned `services` use the existing service card shape where data is available, including planned departure and, for enriched rows, actual arrival/departure timing.
+- Returned `services` use the existing service card shape, with planned departure populated immediately and historical timing/detail fields left unknown until any later enrichment step is added.
 
 For same-day historical verification, use today’s date with a departure time at least 45 minutes behind the current time so the request takes the HSP path instead of live Darwin.
 
