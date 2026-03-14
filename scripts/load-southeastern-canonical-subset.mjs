@@ -2,7 +2,10 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
-import { persistHistoricalRecords } from "../lib/historical/persistence.mjs";
+import {
+  buildHistoricalSearchRow,
+  persistHistoricalRecords,
+} from "../lib/historical/persistence.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -263,6 +266,70 @@ function validateAlignedRows(services, searchRows) {
   }
 }
 
+function validateDerivedSearchRows(services, searchRows) {
+  for (let index = 0; index < services.length; index += 1) {
+    const service = services[index];
+    const expectedRow = searchRows[index];
+    const generatedRow = buildHistoricalSearchRow(service, "__validation__");
+
+    if (generatedRow.service_date !== expectedRow.serviceDate) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected serviceDate value`,
+      );
+    }
+
+    if (generatedRow.origin_crs !== expectedRow.originCrs) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected originCrs value`,
+      );
+    }
+
+    if (generatedRow.destination_crs !== expectedRow.destinationCrs) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected destinationCrs value`,
+      );
+    }
+
+    if (
+      generatedRow.scheduled_departure_ts !== expectedRow.scheduledDepartureTs
+    ) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected scheduledDepartureTs value`,
+      );
+    }
+
+    if (generatedRow.scheduled_arrival_ts !== expectedRow.scheduledArrivalTs) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected scheduledArrivalTs value`,
+      );
+    }
+
+    if (generatedRow.toc_code !== expectedRow.tocCode) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected tocCode value`,
+      );
+    }
+
+    if (generatedRow.status !== expectedRow.status) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected status value`,
+      );
+    }
+
+    if (generatedRow.is_cancelled !== expectedRow.isCancelled) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected isCancelled value`,
+      );
+    }
+
+    if (generatedRow.delay_minutes !== expectedRow.delayMinutes) {
+      throw new Error(
+        `Generated search row for services[${index}] has unexpected delayMinutes value`,
+      );
+    }
+  }
+}
+
 async function readJsonFile(inputPath) {
   let raw;
 
@@ -297,6 +364,7 @@ async function loadCanonicalSubset(inputPath) {
   );
 
   validateAlignedRows(services, searchRows);
+  validateDerivedSearchRows(services, searchRows);
 
   return {
     services,
@@ -326,13 +394,13 @@ async function persistCanonicalServicesInBatches(services, options) {
 }
 
 async function main() {
-  const baseUrl = requireEnv("SUPABASE_URL");
-  const apiKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
   const sourceFile = process.argv[2]
     ? path.resolve(process.cwd(), process.argv[2])
     : defaultInputPath;
 
   const { services, searchRows } = await loadCanonicalSubset(sourceFile);
+  const baseUrl = requireEnv("SUPABASE_URL");
+  const apiKey = requireEnv("SUPABASE_SERVICE_ROLE_KEY");
   const result = await persistCanonicalServicesInBatches(services, {
     baseUrl,
     apiKey,

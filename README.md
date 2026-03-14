@@ -317,6 +317,7 @@ This proof step:
 
 - reads the existing Southeastern canonical inspection JSON
 - validates the expected top-level shape and the count-aligned `services[]` and `searchRows[]` eligible subset
+- validates that the current persistence helper would generate the same `historical_service_search` row shape from each canonical service
 - treats `services[]` as the authoritative persistence input
 - reuses the existing historical datastore write path into `historical_services` and `historical_service_search`
 - prints a concise JSON summary showing read and persisted row counts
