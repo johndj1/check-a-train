@@ -11,8 +11,6 @@ mkdir -p "$BACKLOG_DIR" "$ACTIVE_DIR" "$DONE_DIR"
 
 if ! command -v codex >/dev/null 2>&1; then
   echo "Error: codex CLI is not installed or not on your PATH."
-  echo
-  echo "Install or expose the codex command first, then try again."
   exit 1
 fi
 
@@ -41,21 +39,20 @@ mv "$next_task" "$active_task"
 
 echo
 echo "============================================================"
-echo "RUNNING CODEX FOR: $active_task"
+echo "ACTIVE TASK: $active_task"
 echo "============================================================"
 echo
-
-codex run "$active_task"
-
+echo "Start Codex and use this exact instruction:"
 echo
-echo "============================================================"
-echo "CODEX FINISHED"
-echo "============================================================"
+echo "Please execute the task defined in $active_task."
+echo "You may inspect repository files before making changes."
 echo
-echo "Stopped for review. Next steps:"
-echo "1. Review changes: git diff"
-echo "2. Run tests/build"
-echo "3. If happy, move task to done:"
-echo "   mv \"$active_task\" \"$DONE_DIR/$task_name\""
+echo "Then review with:"
+echo "  git diff"
+echo "  npm run lint"
+echo "  npx tsc --noEmit"
+echo
+echo "If happy, move task to done with:"
+echo "  mv \"$active_task\" \"$DONE_DIR/$task_name\""
 echo
 EOF
