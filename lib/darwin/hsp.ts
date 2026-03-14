@@ -30,6 +30,7 @@ type HspServiceDetailSummary = {
   expectedArrival: string | null;
   delayMins: number | null;
   status: DarwinNormalizedService["status"];
+  statusBasis?: DarwinNormalizedService["statusBasis"];
   callsAtTo?: boolean;
   rawStatusText?: string | null;
 };
@@ -447,7 +448,7 @@ async function loadHspServiceDetailSummary(
   const actualArrival = toHHMM(toLoc ? pickString(toLoc, ["actual_ta"]) : null);
   const aimedDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["gbtt_ptd"]) : null);
   const actualDeparture = toHHMM(fromLoc ? pickString(fromLoc, ["actual_td"]) : null);
-  const { delayMins, status } = deriveDelayAndStatus({
+  const { delayMins, status, basis } = deriveDelayAndStatus({
     cancelled,
     aimedArr: aimedArrival,
     expectedArr: actualArrival,
@@ -477,6 +478,7 @@ async function loadHspServiceDetailSummary(
     expectedArrival: actualArrival,
     delayMins,
     status,
+    statusBasis: basis === "cancelled" ? "raw_status" : basis,
     callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
     rawStatusText: cancelled ? "Cancelled" : "Historical timing data",
   };
@@ -522,6 +524,7 @@ export async function enrichHspService(
       expectedArrival: detail.expectedArrival,
       delayMins: detail.delayMins,
       status: detail.status,
+      statusBasis: detail.statusBasis,
       callsAtTo: detail.callsAtTo,
       rawStatusText: detail.rawStatusText,
     };

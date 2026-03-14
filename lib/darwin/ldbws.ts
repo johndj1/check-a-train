@@ -1,6 +1,10 @@
 import { DarwinHttpError, getJson } from "@/lib/darwin/client";
 import { rankServicesForJourney } from "@/lib/darwin/match";
-import type { DarwinMatchingDiagnostics, DarwinNormalizedService } from "@/lib/darwin/types";
+import type {
+  DarwinMatchingDiagnostics,
+  DarwinNormalizedService,
+  DarwinStatusBasis,
+} from "@/lib/darwin/types";
 import { deriveDelayAndStatus } from "@/lib/status/deriveDelayAndStatus";
 import { isWithinWindow } from "@/lib/time/window";
 
@@ -287,20 +291,25 @@ function normalizeService(service: UnknownRecord, params: DarwinBoardParams, ind
     Boolean(realtimeDepartureRaw && /^cancel/i.test(realtimeDepartureRaw)) ||
     Boolean(realtimeArrivalRaw && /^cancel/i.test(realtimeArrivalRaw));
 
-  let { delayMins, status } = deriveDelayAndStatus({
+  const { delayMins: derivedDelayMins, status: derivedStatus, basis } = deriveDelayAndStatus({
     cancelled,
     aimedArr: scheduledArrival || null,
     expectedArr: expectedArrival,
     aimedDep: scheduledDeparture,
     expectedDep: expectedDeparture,
   });
+  let delayMins = derivedDelayMins;
+  let status = derivedStatus;
+  let statusBasis: DarwinStatusBasis = basis === "cancelled" ? "raw_status" : basis;
 
   if (status === "Unknown" && (realtimeDepartureRaw || realtimeArrivalRaw)) {
     if (/^on time$/i.test(realtimeDepartureRaw ?? "") || /^on time$/i.test(realtimeArrivalRaw ?? "")) {
       status = "On time";
       delayMins = 0;
+      statusBasis = "raw_status";
     } else if (/^delayed$/i.test(realtimeDepartureRaw ?? "") || /^delayed$/i.test(realtimeArrivalRaw ?? "")) {
       status = "Delayed";
+      statusBasis = "raw_status";
     }
   }
 
@@ -330,6 +339,7 @@ function normalizeService(service: UnknownRecord, params: DarwinBoardParams, ind
       realtimeArrivalRaw,
       pickString(service, STATUS_KEYS),
     ]),
+    statusBasis,
     _timetableId: serviceId,
   };
 }

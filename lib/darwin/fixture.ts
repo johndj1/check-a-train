@@ -60,7 +60,7 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
     const aimedArrival = toHHMM(service.aimedArrival) ?? "";
     const expectedArrival = toHHMM(service.expectedArrival);
     const cancelled = String(service.status ?? "").toUpperCase().includes("CANC");
-    const { delayMins, status } = deriveDelayAndStatus({
+    const { delayMins, status, basis } = deriveDelayAndStatus({
       cancelled,
       aimedArr: aimedArrival || null,
       expectedArr: expectedArrival,
@@ -84,6 +84,7 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
       status,
       callsAtTo: undefined,
       rawStatusText: service.status,
+      statusBasis: basis === "cancelled" ? "raw_status" : basis,
       _timetableId: service.rid,
     };
   });

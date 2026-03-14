@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { deriveDelayRepayEligibility } from "@/lib/delay-repay/eligibility";
 import { enrichHspService } from "@/lib/darwin/hsp";
+import { deriveFirstPassStatus } from "@/lib/darwin/match";
 import type { DarwinNormalizedService } from "@/lib/darwin/types";
 import { resolveOperatorClaimUrl } from "@/lib/operators/claim-links";
 import { JourneyProviderError } from "@/lib/providers/journeys-provider";
@@ -47,6 +48,7 @@ export async function GET(req: Request) {
     };
 
     const enriched = await enrichHspService(baseService, { from, to });
+    const firstPassStatus = deriveFirstPassStatus(enriched);
     const eligibility = deriveDelayRepayEligibility({
       delayMins: enriched.delayMins,
     });
@@ -62,6 +64,8 @@ export async function GET(req: Request) {
         status: enriched.status,
         callsAtTo: enriched.callsAtTo,
         rawStatusText: enriched.rawStatusText,
+        statusBasis: firstPassStatus.basis,
+        statusConfidence: firstPassStatus.confidence,
         claimUrl,
         isEligible: eligibility.isEligible,
         eligibilityReason: eligibility.eligibilityReason,

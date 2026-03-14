@@ -233,7 +233,7 @@ function deriveStatus(rawStatus, delayMins) {
 
 function deriveDelayAndStatus({ cancelled, aimedArr, expectedArr, aimedDep, expectedDep }) {
   if (cancelled) {
-    return { delayMins: null, status: "Cancelled" };
+    return { delayMins: null, status: "Cancelled", basis: "cancelled" };
   }
   if (aimedArr && expectedArr) {
     const arrivalDelay = diffMins(aimedArr, expectedArr);
@@ -241,6 +241,7 @@ function deriveDelayAndStatus({ cancelled, aimedArr, expectedArr, aimedDep, expe
       return {
         delayMins: arrivalDelay,
         status: arrivalDelay > 0 ? "Delayed" : "On time",
+        basis: "arrival",
       };
     }
   }
@@ -250,10 +251,11 @@ function deriveDelayAndStatus({ cancelled, aimedArr, expectedArr, aimedDep, expe
       return {
         delayMins: departureDelay,
         status: departureDelay > 0 ? "Delayed" : "On time",
+        basis: "departure",
       };
     }
   }
-  return { delayMins: null, status: "Unknown" };
+  return { delayMins: null, status: "Unknown", basis: "unknown" };
 }
 
 function parseDarwinFixtureServices() {
@@ -471,7 +473,7 @@ function assertDelayAndStatusDerivationRegression() {
     aimedDep: "08:30",
     expectedDep: "08:35",
   });
-  if (caseA.delayMins !== 12 || caseA.status !== "Delayed") {
+  if (caseA.delayMins !== 12 || caseA.status !== "Delayed" || caseA.basis !== "arrival") {
     throw new Error(`Derivation regression case A failed: ${JSON.stringify(caseA)}`);
   }
 
@@ -482,7 +484,7 @@ function assertDelayAndStatusDerivationRegression() {
     aimedDep: "08:30",
     expectedDep: "08:35",
   });
-  if (caseB.delayMins !== 0 || caseB.status !== "On time") {
+  if (caseB.delayMins !== 0 || caseB.status !== "On time" || caseB.basis !== "arrival") {
     throw new Error(`Derivation regression case B failed: ${JSON.stringify(caseB)}`);
   }
 
@@ -493,7 +495,7 @@ function assertDelayAndStatusDerivationRegression() {
     aimedDep: "08:30",
     expectedDep: "08:35",
   });
-  if (caseC.delayMins !== 5 || caseC.status !== "Delayed") {
+  if (caseC.delayMins !== 5 || caseC.status !== "Delayed" || caseC.basis !== "departure") {
     throw new Error(`Derivation regression case C failed: ${JSON.stringify(caseC)}`);
   }
 
@@ -504,7 +506,7 @@ function assertDelayAndStatusDerivationRegression() {
     aimedDep: "08:30",
     expectedDep: null,
   });
-  if (caseD.delayMins !== null || caseD.status !== "Unknown") {
+  if (caseD.delayMins !== null || caseD.status !== "Unknown" || caseD.basis !== "unknown") {
     throw new Error(`Derivation regression case D failed: ${JSON.stringify(caseD)}`);
   }
 
@@ -515,7 +517,7 @@ function assertDelayAndStatusDerivationRegression() {
     aimedDep: "08:30",
     expectedDep: "08:35",
   });
-  if (caseE.delayMins !== null || caseE.status !== "Cancelled") {
+  if (caseE.delayMins !== null || caseE.status !== "Cancelled" || caseE.basis !== "cancelled") {
     throw new Error(`Derivation regression case E failed: ${JSON.stringify(caseE)}`);
   }
 }
