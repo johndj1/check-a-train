@@ -1,5 +1,14 @@
 import { useEffect, useState } from "react";
 
+export type ServiceCallingPoint = {
+  name: string;
+  crs: string | null;
+  aimedArrival: string | null;
+  expectedArrival: string | null;
+  aimedDeparture: string | null;
+  expectedDeparture: string | null;
+};
+
 export type Service = {
   uid: string;
   operator: string | null;
@@ -22,6 +31,8 @@ export type Service = {
   rawStatusText?: string | null;
   statusBasis?: "arrival" | "departure" | "raw_status" | "unknown";
   statusConfidence?: "high" | "medium" | "low";
+  callingPoints?: ServiceCallingPoint[];
+  detailsLoaded?: boolean;
   isEligible?: boolean;
   eligibilityReason?: string;
   eligibilityBand?: "eligible" | "below_threshold" | "unknown_delay";

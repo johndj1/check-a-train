@@ -4,6 +4,15 @@ export type DarwinStatusBasis = "arrival" | "departure" | "raw_status" | "unknow
 
 export type DarwinStatusConfidence = "high" | "medium" | "low";
 
+export type DarwinCallingPoint = {
+  name: string;
+  crs: string | null;
+  aimedArrival: string | null;
+  expectedArrival: string | null;
+  aimedDeparture: string | null;
+  expectedDeparture: string | null;
+};
+
 export type DarwinFirstPassStatus = {
   status: ServiceStatus;
   delayMins: number | null;
@@ -61,6 +70,8 @@ export type DarwinNormalizedService = {
   isBestMatch?: boolean;
   statusBasis?: DarwinStatusBasis;
   statusConfidence?: DarwinStatusConfidence;
+  callingPoints?: DarwinCallingPoint[];
+  detailsLoaded?: boolean;
   _timetableId?: string | null;
 };
 

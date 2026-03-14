@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { rankServicesForJourney } from "@/lib/darwin/match";
 import type {
+  DarwinCallingPoint,
   DarwinFixtureFetchParams,
   DarwinMatchingDiagnostics,
   DarwinNormalizedService,
@@ -23,6 +24,61 @@ type FixtureService = {
 
 type FixturePayload = {
   services: FixtureService[];
+};
+
+const FIXTURE_CALLING_POINTS_BY_UID: Record<string, DarwinCallingPoint[]> = {
+  "DARWIN:202603020850": [
+    {
+      name: "Sevenoaks",
+      crs: "SEV",
+      aimedArrival: null,
+      expectedArrival: null,
+      aimedDeparture: "08:50",
+      expectedDeparture: "08:52",
+    },
+    {
+      name: "Orpington",
+      crs: "ORP",
+      aimedArrival: "09:03",
+      expectedArrival: "09:08",
+      aimedDeparture: "09:04",
+      expectedDeparture: "09:09",
+    },
+    {
+      name: "London Bridge",
+      crs: "LBG",
+      aimedArrival: "09:20",
+      expectedArrival: "09:25",
+      aimedDeparture: null,
+      expectedDeparture: null,
+    },
+  ],
+  "DARWIN:202603020905": [
+    {
+      name: "Sevenoaks",
+      crs: "SEV",
+      aimedArrival: null,
+      expectedArrival: null,
+      aimedDeparture: "09:05",
+      expectedDeparture: "09:05",
+    },
+    {
+      name: "Orpington",
+      crs: "ORP",
+      aimedArrival: "09:18",
+      expectedArrival: "09:18",
+      aimedDeparture: "09:19",
+      expectedDeparture: "09:19",
+    },
+    {
+      name: "London Bridge",
+      crs: "LBG",
+      aimedArrival: "09:35",
+      expectedArrival: "09:35",
+      aimedDeparture: null,
+      expectedDeparture: null,
+    },
+  ],
 };
 
 function fixturePath(fileName: string) {
@@ -153,5 +209,12 @@ export async function getFixtureJourneys(query: DarwinFixtureFetchParams) {
     diagnostics,
     source: "darwin.fixture",
     note: "Using Darwin fixture data (DARWIN_MODE=fixture).",
+  };
+}
+
+export function getFixtureServiceDetails(uid: string) {
+  return {
+    callingPoints: FIXTURE_CALLING_POINTS_BY_UID[uid] ?? [],
+    detailsLoaded: true,
   };
 }

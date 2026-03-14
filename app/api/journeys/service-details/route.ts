@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deriveDelayRepayEligibility } from "@/lib/delay-repay/eligibility";
+import { getFixtureServiceDetails } from "@/lib/darwin/fixture";
 import { enrichHspService } from "@/lib/darwin/hsp";
 import { deriveFirstPassStatus } from "@/lib/darwin/match";
 import type { DarwinNormalizedService } from "@/lib/darwin/types";
@@ -10,12 +11,17 @@ function isHistoricalHspUid(uid: string) {
   return uid.startsWith("HSP:") && uid.length > 4;
 }
 
+function isDarwinFixtureUid(uid: string) {
+  return uid.startsWith("DARWIN:") && uid.length > 7;
+}
+
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const uid = searchParams.get("uid")?.trim() ?? "";
     const from = searchParams.get("from")?.trim() ?? "";
     const to = searchParams.get("to")?.trim() ?? "";
+    const providerSource = searchParams.get("providerSource")?.trim() ?? "";
 
     if (!uid || !from || !to) {
       return NextResponse.json(
@@ -24,10 +30,16 @@ export async function GET(req: Request) {
       );
     }
 
+    if (providerSource === "darwin.fixture" && isDarwinFixtureUid(uid)) {
+      return NextResponse.json({
+        service: getFixtureServiceDetails(uid),
+      });
+    }
+
     if (!isHistoricalHspUid(uid)) {
       return NextResponse.json(
-        { error: "Only historical HSP services support lazy detail enrichment." },
-        { status: 400 },
+        { error: "Calling points are not available for this service source yet." },
+        { status: 501 },
       );
     }
 
@@ -66,6 +78,8 @@ export async function GET(req: Request) {
         rawStatusText: enriched.rawStatusText,
         statusBasis: firstPassStatus.basis,
         statusConfidence: firstPassStatus.confidence,
+        callingPoints: enriched.callingPoints ?? [],
+        detailsLoaded: true,
         claimUrl,
         isEligible: eligibility.isEligible,
         eligibilityReason: eligibility.eligibilityReason,

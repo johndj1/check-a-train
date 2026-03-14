@@ -221,13 +221,13 @@ export default function HomeClient() {
     }
   }
 
-  async function loadHistoricalServiceDetails(service: Partial<Service>) {
+  async function loadServiceDetails(service: Partial<Service>) {
     const uid = typeof service.uid === "string" ? service.uid : "";
-    if (!uid || service.providerSource !== "darwin.hsp") return;
+    if (!uid) return;
 
     const current = services.find((entry) => entry.uid === uid);
     if (!current) return;
-    if (current.expectedArrival != null || current.expectedDeparture != null) return;
+    if (current.detailsLoaded) return;
     if (serviceDetailLoading[uid]) return;
 
     setServiceDetailLoading((prev) => ({ ...prev, [uid]: true }));
@@ -236,7 +236,8 @@ export default function HomeClient() {
     const url =
       `/api/journeys/service-details?uid=${encodeURIComponent(uid)}` +
       `&from=${encodeURIComponent(queryView.fromCode)}` +
-      `&to=${encodeURIComponent(queryView.toCode)}`;
+      `&to=${encodeURIComponent(queryView.toCode)}` +
+      `&providerSource=${encodeURIComponent(current.providerSource ?? "")}`;
 
     try {
       const res = await fetch(url);
@@ -673,7 +674,7 @@ export default function HomeClient() {
                     service={s}
                     detailLoading={serviceDetailLoading[s.uid] === true}
                     detailError={serviceDetailError[s.uid] ?? null}
-                    onExpandDetails={loadHistoricalServiceDetails}
+                    onExpandDetails={loadServiceDetails}
                   />
                 ))}
               </div>

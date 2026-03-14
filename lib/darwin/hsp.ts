@@ -1,6 +1,7 @@
 import { DarwinHttpError, DarwinTimeoutError, postJson } from "@/lib/darwin/client";
 import { rankServicesForJourney } from "@/lib/darwin/match";
 import type {
+  DarwinCallingPoint,
   DarwinMatchingDiagnostics,
   DarwinNormalizedService,
   HspDayType,
@@ -31,6 +32,7 @@ type HspServiceDetailSummary = {
   delayMins: number | null;
   status: DarwinNormalizedService["status"];
   statusBasis?: DarwinNormalizedService["statusBasis"];
+  callingPoints?: DarwinCallingPoint[];
   callsAtTo?: boolean;
   rawStatusText?: string | null;
 };
@@ -342,6 +344,33 @@ function findLocationByCrs(locations: HspLocation[], crs: string) {
   );
 }
 
+function buildCallingPoints(locations: HspLocation[]): DarwinCallingPoint[] {
+  return locations
+    .map((location) => {
+      const name = findFirstStringDeep(location, ["locationName", "name", "location"]);
+      const crs =
+        findFirstStringDeep(location, ["crs", "tpl", "crs_code", "location_code"])?.toUpperCase() ?? null;
+      const aimedArrival = toHHMM(pickString(location, ["gbtt_pta"]));
+      const expectedArrival = toHHMM(pickString(location, ["actual_ta"]));
+      const aimedDeparture = toHHMM(pickString(location, ["gbtt_ptd"]));
+      const expectedDeparture = toHHMM(pickString(location, ["actual_td"]));
+
+      if (!name || (!aimedArrival && !expectedArrival && !aimedDeparture && !expectedDeparture)) {
+        return null;
+      }
+
+      return {
+        name,
+        crs,
+        aimedArrival,
+        expectedArrival,
+        aimedDeparture,
+        expectedDeparture,
+      };
+    })
+    .filter((point): point is DarwinCallingPoint => point !== null);
+}
+
 function getConfig() {
   const apiKey = process.env.HSP_API_KEY?.trim();
   const baseUrl =
@@ -479,6 +508,7 @@ async function loadHspServiceDetailSummary(
     delayMins,
     status,
     statusBasis: basis === "cancelled" ? "raw_status" : basis,
+    callingPoints: buildCallingPoints(details.locations),
     callsAtTo: toLoc ? true : details.locations.length > 0 ? false : undefined,
     rawStatusText: cancelled ? "Cancelled" : "Historical timing data",
   };
@@ -525,6 +555,8 @@ export async function enrichHspService(
       delayMins: detail.delayMins,
       status: detail.status,
       statusBasis: detail.statusBasis,
+      callingPoints: detail.callingPoints,
+      detailsLoaded: true,
       callsAtTo: detail.callsAtTo,
       rawStatusText: detail.rawStatusText,
     };

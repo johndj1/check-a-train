@@ -103,15 +103,13 @@ export default function ServiceCard({
   useEffect(() => {
     if (!expanded || !service || !onExpandDetails) return;
 
-    const needsHistoricalDetailLoad =
-      service.providerSource === "darwin.hsp" &&
+    const needsDetailLoad =
       typeof service.uid === "string" &&
-      service.uid.startsWith("HSP:") &&
-      service.expectedArrival == null &&
-      service.expectedDeparture == null &&
+      service.uid.length > 0 &&
+      service.detailsLoaded !== true &&
       !detailError;
 
-    if (!needsHistoricalDetailLoad) return;
+    if (!needsDetailLoad) return;
     void onExpandDetails(service);
   }, [detailError, expanded, onExpandDetails, service]);
 
@@ -161,6 +159,7 @@ export default function ServiceCard({
     service.statusConfidence === "low"
       ? service.statusConfidence
       : "low";
+  const callingPoints = Array.isArray(service.callingPoints) ? service.callingPoints : [];
   const eligibility = eligibilityCopy(service);
   const confidence = confidenceCopy(statusConfidence);
   const destinationStop = destinationStopCopy(callsAtTo);
@@ -302,7 +301,7 @@ export default function ServiceCard({
                   Timing evidence
                 </h3>
                 {detailLoading && (
-                  <p className="mt-2 text-xs text-zinc-500">Loading historical service details…</p>
+                  <p className="mt-2 text-xs text-zinc-500">Loading service details…</p>
                 )}
                 {detailError && <p className="mt-2 text-xs text-red-300">{detailError}</p>}
                 <dl className="mt-2 space-y-2">
@@ -359,6 +358,41 @@ export default function ServiceCard({
                 </dl>
               </section>
             </div>
+
+            <section className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.16em] text-zinc-500">
+                Calling points
+              </h3>
+              {callingPoints.length > 0 ? (
+                <ol className="mt-3 space-y-2">
+                  {callingPoints.map((point, index) => {
+                    const pointKey = `${point.crs ?? point.name}-${index}`;
+                    const plannedTime = point.aimedDeparture ?? point.aimedArrival ?? "—";
+                    const liveTime = point.expectedDeparture ?? point.expectedArrival ?? "—";
+
+                    return (
+                      <li
+                        key={pointKey}
+                        className="flex items-start justify-between gap-3 border-b border-zinc-800/70 pb-2 last:border-b-0 last:pb-0"
+                      >
+                        <div className="min-w-0">
+                          <p className="font-medium text-zinc-100">{point.name}</p>
+                          <p className="text-xs text-zinc-500">{point.crs ?? "CRS unavailable"}</p>
+                        </div>
+                        <div className="shrink-0 text-right text-xs">
+                          <p className="text-zinc-400">Planned {plannedTime}</p>
+                          <p className="text-zinc-200">Live {liveTime}</p>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ol>
+              ) : (
+                <p className="mt-2 text-zinc-400">
+                  Calling points are not available for this service.
+                </p>
+              )}
+            </section>
 
             <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
               <section className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3">
