@@ -1,4 +1,3 @@
-cat > scripts/run-ai-task.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -24,13 +23,19 @@ if [ "$active_count" -gt 0 ]; then
   exit 1
 fi
 
-next_task="$(find "$BACKLOG_DIR" -maxdepth 1 -type f -name '*.md' | sort | head -n 1)"
+shopt -s nullglob
+backlog_tasks=("$BACKLOG_DIR"/*.md)
+shopt -u nullglob
 
-if [ -z "${next_task:-}" ]; then
+if [ "${#backlog_tasks[@]}" -eq 0 ]; then
   echo "No backlog tasks found."
   exit 0
 fi
 
+IFS=$'\n' sorted_tasks=($(printf '%s\n' "${backlog_tasks[@]}" | sort))
+unset IFS
+
+next_task="${sorted_tasks[0]}"
 task_name="$(basename "$next_task")"
 active_task="$ACTIVE_DIR/$task_name"
 
@@ -55,4 +60,3 @@ echo
 echo "If happy, move task to done with:"
 echo "  mv \"$active_task\" \"$DONE_DIR/$task_name\""
 echo
-EOF
