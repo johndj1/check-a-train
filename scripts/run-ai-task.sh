@@ -1,3 +1,4 @@
+cat > scripts/run-ai-task.sh <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 
@@ -7,6 +8,13 @@ ACTIVE_DIR="$REPO_ROOT/tasks/active"
 DONE_DIR="$REPO_ROOT/tasks/done"
 
 mkdir -p "$BACKLOG_DIR" "$ACTIVE_DIR" "$DONE_DIR"
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "Error: codex CLI is not installed or not on your PATH."
+  echo
+  echo "Install or expose the codex command first, then try again."
+  exit 1
+fi
 
 active_count="$(find "$ACTIVE_DIR" -maxdepth 1 -type f -name '*.md' | wc -l | tr -d ' ')"
 
@@ -50,3 +58,4 @@ echo "2. Run tests/build"
 echo "3. If happy, move task to done:"
 echo "   mv \"$active_task\" \"$DONE_DIR/$task_name\""
 echo
+EOF
